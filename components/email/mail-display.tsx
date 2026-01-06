@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { Search, Loader2, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -80,7 +80,11 @@ export function MailDisplay({
     setEmails(initialEmails);
   }, [initialEmails]);
 
-  const handleToggleArchive = async (id: string, current: boolean) => {
+  const updateEmailState = useCallback((id: string, updates: Partial<Email>) => {
+    setEmails(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e));
+  }, []);
+
+  const handleToggleArchive = useCallback(async (id: string, current: boolean) => {
     const newState = !current;
     updateEmailState(id, { isArchived: newState });
     
@@ -92,9 +96,9 @@ export function MailDisplay({
       updateEmailState(id, { isArchived: current }); // Rollback
       toast.error("Failed to update email");
     }
-  };
+  }, [updateEmailState]);
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = useCallback(async (id: string) => {
     if (!confirm("Are you sure you want to permanently delete this email?")) return;
     
     try {
@@ -105,7 +109,7 @@ export function MailDisplay({
     } catch (err) {
       toast.error("Could not delete email");
     }
-  };
+  }, [selectedEmailId]);
 
   const filteredEmails = emails.filter(email => {
     if (type === 'inbox' && email.isArchived) return false;
@@ -123,10 +127,6 @@ export function MailDisplay({
   });
 
   const selectedEmail = emails.find(e => e.id === selectedEmailId);
-
-  const updateEmailState = (id: string, updates: Partial<Email>) => {
-    setEmails(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e));
-  };
 
   // Decrypt email when selected
   useEffect(() => {
@@ -194,6 +194,10 @@ export function MailDisplay({
         if (!email.read) {
           try {
             await emailsApi.updateEmail({ emailId: email.id, read: true });
+            // Dispatch event to update inbox count immediately
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new Event('email-read'));
+            }
           } catch (err) {
             console.error("Failed to mark as read", err);
           }
@@ -211,9 +215,9 @@ export function MailDisplay({
     };
 
     decryptEmail();
-  }, [selectedEmailId, privateKey, type, emails]);
+  }, [selectedEmailId, privateKey, type, emails, updateEmailState]);
 
-  const handleSelectEmail = (email: Email) => {
+  const handleSelectEmail = useCallback((email: Email) => {
     setSelectedEmailId(email.id);
     setShowMobileDetail(true);
     
@@ -221,13 +225,13 @@ export function MailDisplay({
     if (!email.read && !email.decryptedContent) {
       updateEmailState(email.id, { read: true });
     }
-  };
+  }, [updateEmailState]);
 
-  const handleCloseMobileDetail = () => {
+  const handleCloseMobileDetail = useCallback(() => {
     setShowMobileDetail(false);
-  };
+  }, []);
 
-  const handleToggleStar = async (id: string, current: boolean) => {
+  const handleToggleStar = useCallback(async (id: string, current: boolean) => {
     const newState = !current;
     updateEmailState(id, { isStarred: newState });
     
@@ -237,10 +241,10 @@ export function MailDisplay({
       console.error("Failed to update star status", err);
       updateEmailState(id, { isStarred: current }); // Rollback
     }
-  };
+  }, [updateEmailState]);
 
-  // Mail List Component
-  const MailList = () => (
+  // Mail List JSX
+  const mailListContent = (
     <div className="flex flex-col h-full">
       <div className="flex items-center px-4 py-2 border-b h-[52px]">
         <h1 className="text-xl font-bold mr-4">
@@ -255,6 +259,7 @@ export function MailDisplay({
                 className="pl-8 h-9" 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                autoComplete="off"
               />
             </div>
           </form>
@@ -360,7 +365,7 @@ export function MailDisplay({
         <ResizablePanelGroup direction="horizontal" className="h-[calc(100vh-2rem)] rounded-lg border items-stretch shadow-sm bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
           {/* List Pane */}
           <ResizablePanel defaultSize={40} minSize={30} className="flex flex-col border-r">
-            <MailList />
+            {mailListContent}
           </ResizablePanel>
           
           <ResizableHandle />
@@ -381,7 +386,7 @@ export function MailDisplay({
       <div className="md:hidden h-full flex flex-col">
         {!showMobileDetail ? (
           <div className="h-full rounded-lg border shadow-sm bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
-            <MailList />
+            {mailListContent}
           </div>
         ) : (
           <div className="h-full rounded-lg border shadow-sm bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">

@@ -56,9 +56,23 @@ export default function InboxLayout({
     };
 
     fetchCounts();
-    // Poll every 15s
-    const interval = setInterval(fetchCounts, 15000);
-    return () => clearInterval(interval);
+    // Poll every 1s for real-time updates
+    const interval = setInterval(fetchCounts, 1000);
+    
+    // Listen for custom event when email is read
+    const handleEmailRead = () => {
+      fetchCounts();
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('email-read', handleEmailRead);
+    }
+    
+    return () => {
+      clearInterval(interval);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('email-read', handleEmailRead);
+      }
+    };
   }, [user]);
 
   if (!user) {
