@@ -34,8 +34,10 @@ model Email {
   signature   String // Signature of the Message Hash by Sender's Private Key
   messageHash String // Hash of the original content
 
-  read      Boolean  @default(false)
-  timestamp DateTime @default(now())
+  read       Boolean  @default(false)
+  isStarred  Boolean  @default(false)
+  isArchived Boolean  @default(false)
+  timestamp  DateTime @default(now())
 
   sender    User @relation("SentEmails", fields: [senderId], references: [id])
   recipient User @relation("ReceivedEmails", fields: [recipientId], references: [id])
