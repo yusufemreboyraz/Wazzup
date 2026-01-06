@@ -123,17 +123,23 @@ export function MailDisplay({
     setEmails(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e));
   };
 
-  const handleSelectEmail = async (email: Email) => {
-    setSelectedEmailId(email.id);
+  // Decrypt email when selected
+  useEffect(() => {
+    if (!selectedEmailId || !privateKey) return;
     
-    if (!email.decryptedContent && privateKey) {
+    const email = emails.find(e => e.id === selectedEmailId);
+    if (!email || email.decryptedContent) return;
+
+    const decryptEmail = async () => {
       try {
         if (type === "sent") {
+          // Sent emails: we can't decrypt (key was for recipient)
           const mockContent = `[Secure Message Sent]\n\n(You cannot read this because the key was encrypted only for the recipient: ${email.recipient.name})`;
           updateEmailState(email.id, { decryptedContent: mockContent, integrityVerified: true });
           return;
         }
 
+        // Inbox/Archive: decrypt the email
         const aesKeyHex = decryptAesKey(email.encryptedAesKey, privateKey);
         const [cipherText, authTag] = email.encryptedContent.split(":");
         const decryptedText = decryptContent(cipherText, email.iv, aesKeyHex, authTag);
@@ -151,6 +157,7 @@ export function MailDisplay({
           integrityVerified: isValid 
         });
 
+        // Mark as read on server
         if (!email.read) {
           try {
             await emailsApi.updateEmail({ emailId: email.id, read: true });
@@ -159,16 +166,20 @@ export function MailDisplay({
           }
         }
       } catch (err) {
-        console.error(err);
+        console.error("Decryption error:", err);
         updateEmailState(email.id, { decryptedContent: "[Decryption Failed]", integrityVerified: false });
       }
-    } else if (!email.read) {
+    };
+
+    decryptEmail();
+  }, [selectedEmailId, privateKey, type, emails]);
+
+  const handleSelectEmail = (email: Email) => {
+    setSelectedEmailId(email.id);
+    
+    // Mark as read if not already (optimistic update)
+    if (!email.read && !email.decryptedContent) {
       updateEmailState(email.id, { read: true });
-      try {
-        await emailsApi.updateEmail({ emailId: email.id, read: true });
-      } catch (err) {
-        console.error("Failed to mark as read", err);
-      }
     }
   };
 
