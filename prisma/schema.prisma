@@ -1,0 +1,41 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                  String   @id @default(uuid())
+  username            String   @unique
+  passwordHash        String
+  publicKey           String
+  encryptedPrivateKey String
+  createdAt           DateTime @default(now())
+
+  sentEmails     Email[] @relation("SentEmails")
+  receivedEmails Email[] @relation("ReceivedEmails")
+}
+
+model Email {
+  id          String @id @default(uuid())
+  senderId    String
+  recipientId String
+
+  // Confidentiality
+  encryptedContent String
+  encryptedAesKey  String // The AES key encrypted with Recipient's Public Key
+  iv               String // IV for AES encryption
+
+  // Integrity & Authenticity
+  signature   String // Signature of the Message Hash by Sender's Private Key
+  messageHash String // Hash of the original content
+
+  read      Boolean  @default(false)
+  timestamp DateTime @default(now())
+
+  sender    User @relation("SentEmails", fields: [senderId], references: [id])
+  recipient User @relation("ReceivedEmails", fields: [recipientId], references: [id])
+}
