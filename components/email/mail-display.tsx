@@ -15,7 +15,7 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { ReadingPane } from "./reading-pane";
-import { decryptContent, decryptAesKey, verifySignature } from "@/lib/crypto";
+import { decryptContent, decryptAesKey, verifySignature, hashContent } from "@/lib/crypto";
 import { useAuth } from "@/context/auth-context";
 import { emailsApi, PaginationInfo } from "@/lib/api";
 import { toast } from "sonner";
@@ -44,7 +44,11 @@ interface Email {
   isArchived: boolean;
   decryptedContent?: string;
   decryptedAesKey?: string;
-  integrityVerified?: boolean;
+  // Security verification results (3 separate checks)
+  hashVerified?: boolean;         // SHA256(content) === messageHash
+  signatureValid?: boolean;       // RSA-PSS signature is valid
+  senderAuthenticated?: boolean;  // Sender identity confirmed
+  integrityVerified?: boolean;    // Legacy: all checks passed
   attachments?: Attachment[];
 }
 
@@ -135,7 +139,13 @@ export function MailDisplay({
         if (type === "sent") {
           // Sent emails: we can't decrypt (key was for recipient)
           const mockContent = `[Secure Message Sent]\n\n(You cannot read this because the key was encrypted only for the recipient: ${email.recipient.name})`;
-          updateEmailState(email.id, { decryptedContent: mockContent, integrityVerified: true });
+          updateEmailState(email.id, { 
+            decryptedContent: mockContent, 
+            hashVerified: true,
+            signatureValid: true,
+            senderAuthenticated: true,
+            integrityVerified: true 
+          });
           return;
         }
 
@@ -144,17 +154,39 @@ export function MailDisplay({
         const [cipherText, authTag] = email.encryptedContent.split(":");
         const decryptedText = decryptContent(cipherText, email.iv, aesKeyHex, authTag);
 
-        const isValid = verifySignature(
-          decryptedText, 
-          email.signature, 
-          email.sender.publicKey
-        );
+        // === 3 SEPARATE SECURITY CHECKS ===
+        
+        // 1. Hash Verification: Does computed hash match stored hash?
+        const computedHash = hashContent(decryptedText);
+        const hashVerified = computedHash === email.messageHash;
+
+        // 2. Signature Verification: Is the digital signature valid?
+        let signatureValid = false;
+        try {
+          signatureValid = verifySignature(
+            decryptedText, 
+            email.signature, 
+            email.sender.publicKey
+          );
+        } catch {
+          signatureValid = false;
+        }
+
+        // 3. Sender Authentication: Is the sender identity confirmed?
+        // (If signature is valid with sender's public key, sender is authenticated)
+        const senderAuthenticated = signatureValid;
+
+        // Legacy: all checks must pass
+        const integrityVerified = hashVerified && signatureValid && senderAuthenticated;
 
         updateEmailState(email.id, { 
           read: true, 
           decryptedContent: decryptedText, 
           decryptedAesKey: aesKeyHex,
-          integrityVerified: isValid 
+          hashVerified,
+          signatureValid,
+          senderAuthenticated,
+          integrityVerified
         });
 
         // Mark as read on server
@@ -167,7 +199,13 @@ export function MailDisplay({
         }
       } catch (err) {
         console.error("Decryption error:", err);
-        updateEmailState(email.id, { decryptedContent: "[Decryption Failed]", integrityVerified: false });
+        updateEmailState(email.id, { 
+          decryptedContent: "[Decryption Failed]", 
+          hashVerified: false,
+          signatureValid: false,
+          senderAuthenticated: false,
+          integrityVerified: false 
+        });
       }
     };
 
@@ -196,14 +234,14 @@ export function MailDisplay({
   };
 
   return (
-    <ResizablePanelGroup direction="horizontal" className="h-[calc(100vh-2rem)] rounded-lg border items-stretch shadow-sm bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <ResizablePanelGroup direction="horizontal" className="h-[calc(100vh-2rem)] rounded-lg border items-stretch shadow-sm bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
       {/* List Pane */}
       <ResizablePanel defaultSize={40} minSize={30} className="flex flex-col border-r">
         <div className="flex items-center px-4 py-2 border-b h-[52px]">
           <h1 className="text-xl font-bold mr-4">
             {type === 'inbox' ? 'Inbox' : type === 'sent' ? 'Sent' : 'Archive'}
           </h1>
-          <div className="bg-background/95 p-1 backdrop-blur supports-[backdrop-filter]:bg-background/60 w-full">
+          <div className="bg-background/95 p-1 backdrop-blur supports-backdrop-filter:bg-background/60 w-full">
             <form onSubmit={(e) => e.preventDefault()}>
               <div className="relative">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />

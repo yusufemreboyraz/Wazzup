@@ -64,31 +64,58 @@ function SecurityCertificateDialog({
     setTimeout(() => setCopiedField(null), 2000);
   };
 
-  const isVerified = email?.integrityVerified;
+  // Individual verification results
+  const hashVerified = email?.hashVerified ?? false;
+  const signatureValid = email?.signatureValid ?? false;
+  const senderAuthenticated = email?.senderAuthenticated ?? false;
+  
+  // Count passed checks
+  const passedChecks = [hashVerified, signatureValid, senderAuthenticated].filter(Boolean).length;
+  const allPassed = passedChecks === 3;
+  const someFailed = passedChecks < 3;
+
+  // Determine header color
+  const getHeaderStyle = () => {
+    if (allPassed) return 'bg-green-500/10';
+    if (passedChecks === 0) return 'bg-red-500/10';
+    return 'bg-amber-500/10'; // Partial pass
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[550px] p-0 overflow-hidden">
         {/* Header */}
-        <DialogHeader className={`px-6 py-4 border-b ${isVerified ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
+        <DialogHeader className={`px-6 py-4 border-b ${getHeaderStyle()}`}>
           <div className="flex items-center gap-3">
-            {isVerified ? (
+            {allPassed ? (
               <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center">
                 <ShieldCheck className="w-6 h-6 text-green-600" />
               </div>
-            ) : (
+            ) : passedChecks === 0 ? (
               <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">
                 <ShieldX className="w-6 h-6 text-red-600" />
               </div>
+            ) : (
+              <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center">
+                <ShieldX className="w-6 h-6 text-amber-600" />
+              </div>
             )}
             <div>
-              <DialogTitle className={isVerified ? 'text-green-700 dark:text-green-400' : 'text-red-700 dark:text-red-400'}>
-                {isVerified ? 'Message Verified' : 'Verification Failed'}
+              <DialogTitle className={
+                allPassed ? 'text-green-700 dark:text-green-400' : 
+                passedChecks === 0 ? 'text-red-700 dark:text-red-400' :
+                'text-amber-700 dark:text-amber-400'
+              }>
+                {allPassed ? 'Message Verified' : 
+                 passedChecks === 0 ? 'Verification Failed' :
+                 `Partial Verification (${passedChecks}/3)`}
               </DialogTitle>
               <p className="text-sm text-muted-foreground mt-0.5">
-                {isVerified 
+                {allPassed 
                   ? 'This message is authentic and has not been tampered with'
-                  : 'This message may have been modified or is not authentic'
+                  : someFailed 
+                    ? 'Some security checks failed - message may have been modified'
+                    : 'All security checks failed - do not trust this message'
                 }
               </p>
             </div>
@@ -103,12 +130,42 @@ function SecurityCertificateDialog({
             </h4>
             
             <div className="space-y-2">
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border">
+              {/* Hash Check */}
+              <div className={`flex items-center justify-between p-3 rounded-lg border ${
+                hashVerified ? 'bg-green-500/5 border-green-500/20' : 'bg-red-500/5 border-red-500/20'
+              }`}>
                 <div className="flex items-center gap-2">
-                  <FileDigit className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm">Digital Signature</span>
+                  <Lock className={`w-4 h-4 ${hashVerified ? 'text-green-600' : 'text-red-600'}`} />
+                  <div>
+                    <span className="text-sm font-medium">Message Integrity</span>
+                    <p className="text-[10px] text-muted-foreground">SHA-256 hash verification</p>
+                  </div>
                 </div>
-                {isVerified ? (
+                {hashVerified ? (
+                  <div className="flex items-center gap-1 text-green-600">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span className="text-xs font-medium">Intact</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1 text-red-600">
+                    <XCircle className="w-4 h-4" />
+                    <span className="text-xs font-medium">Modified</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Signature Check */}
+              <div className={`flex items-center justify-between p-3 rounded-lg border ${
+                signatureValid ? 'bg-green-500/5 border-green-500/20' : 'bg-red-500/5 border-red-500/20'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <FileDigit className={`w-4 h-4 ${signatureValid ? 'text-green-600' : 'text-red-600'}`} />
+                  <div>
+                    <span className="text-sm font-medium">Digital Signature</span>
+                    <p className="text-[10px] text-muted-foreground">RSA-PSS signature validation</p>
+                  </div>
+                </div>
+                {signatureValid ? (
                   <div className="flex items-center gap-1 text-green-600">
                     <CheckCircle2 className="w-4 h-4" />
                     <span className="text-xs font-medium">Valid</span>
@@ -121,30 +178,18 @@ function SecurityCertificateDialog({
                 )}
               </div>
 
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border">
+              {/* Sender Authentication */}
+              <div className={`flex items-center justify-between p-3 rounded-lg border ${
+                senderAuthenticated ? 'bg-green-500/5 border-green-500/20' : 'bg-red-500/5 border-red-500/20'
+              }`}>
                 <div className="flex items-center gap-2">
-                  <Lock className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm">Message Integrity</span>
-                </div>
-                {isVerified ? (
-                  <div className="flex items-center gap-1 text-green-600">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span className="text-xs font-medium">Intact</span>
+                  <Key className={`w-4 h-4 ${senderAuthenticated ? 'text-green-600' : 'text-red-600'}`} />
+                  <div>
+                    <span className="text-sm font-medium">Sender Authentication</span>
+                    <p className="text-[10px] text-muted-foreground">Identity verification via public key</p>
                   </div>
-                ) : (
-                  <div className="flex items-center gap-1 text-red-600">
-                    <XCircle className="w-4 h-4" />
-                    <span className="text-xs font-medium">Compromised</span>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border">
-                <div className="flex items-center gap-2">
-                  <Key className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm">Sender Authentication</span>
                 </div>
-                {isVerified ? (
+                {senderAuthenticated ? (
                   <div className="flex items-center gap-1 text-green-600">
                     <CheckCircle2 className="w-4 h-4" />
                     <span className="text-xs font-medium">Confirmed</span>
@@ -263,7 +308,7 @@ function SecurityCertificateDialog({
                 <p className="font-medium text-sm">{email?.sender?.name}</p>
                 <p className="text-xs text-muted-foreground">{email?.sender?.email}</p>
               </div>
-              {isVerified && (
+              {allPassed && (
                 <div className="ml-auto">
                   <div className="px-2 py-1 rounded bg-green-500/10 text-green-600 text-xs font-medium flex items-center gap-1">
                     <ShieldCheck className="w-3 h-3" /> Verified
@@ -454,29 +499,47 @@ export function ReadingPane({ email, onClose, onToggleStar, onToggleArchive, onD
           )}
           
           {/* Security Badge - CLICKABLE */}
-          <div className="mt-8 pt-4 border-t">
-            <button
-              onClick={() => setShowCertificate(true)}
-              className={`text-xs px-3 py-2 rounded w-fit flex items-center gap-2 border cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98] ${
-                email.integrityVerified 
-                  ? 'bg-green-500/10 text-green-600 border-green-500/20 hover:bg-green-500/20 hover:border-green-500/30' 
-                  : 'bg-red-500/10 text-red-600 border-red-500/20 hover:bg-red-500/20 hover:border-red-500/30'
-              }`}
-            >
-              {email.integrityVerified ? (
-                <>
-                  <ShieldCheck className="w-4 h-4" />
-                  <span>Integrity Verified & Signed by {email.sender?.name}</span>
-                </>
-              ) : (
-                <>
-                  <ShieldX className="w-4 h-4" />
-                  <span>Integrity Check Failed</span>
-                </>
-              )}
-              <span className="text-[10px] opacity-60 ml-1">Click for details</span>
-            </button>
-          </div>
+          {(() => {
+            const hashOk = email.hashVerified ?? false;
+            const sigOk = email.signatureValid ?? false;
+            const authOk = email.senderAuthenticated ?? false;
+            const passed = [hashOk, sigOk, authOk].filter(Boolean).length;
+            const allPassed = passed === 3;
+            const nonePassed = passed === 0;
+            
+            const badgeStyle = allPassed 
+              ? 'bg-green-500/10 text-green-600 border-green-500/20 hover:bg-green-500/20' 
+              : nonePassed 
+                ? 'bg-red-500/10 text-red-600 border-red-500/20 hover:bg-red-500/20'
+                : 'bg-amber-500/10 text-amber-600 border-amber-500/20 hover:bg-amber-500/20';
+            
+            return (
+              <div className="mt-8 pt-4 border-t">
+                <button
+                  onClick={() => setShowCertificate(true)}
+                  className={`text-xs px-3 py-2 rounded w-fit flex items-center gap-2 border cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98] ${badgeStyle}`}
+                >
+                  {allPassed ? (
+                    <>
+                      <ShieldCheck className="w-4 h-4" />
+                      <span>Verified & Signed by {email.sender?.name}</span>
+                    </>
+                  ) : nonePassed ? (
+                    <>
+                      <ShieldX className="w-4 h-4" />
+                      <span>All Security Checks Failed</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShieldX className="w-4 h-4" />
+                      <span>Partial Verification ({passed}/3 checks passed)</span>
+                    </>
+                  )}
+                  <span className="text-[10px] opacity-60 ml-1">Click for details</span>
+                </button>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Footer Actions */}
