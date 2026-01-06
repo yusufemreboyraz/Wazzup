@@ -20,7 +20,7 @@ import { toast } from "sonner";
 import Link from "next/link";
 
 const formSchema = z.object({
-  email: z.string().email("Invalid email").min(1, "Email is required"),
+  emailUser: z.string().min(1, "Username is required"),
   password: z.string().min(1, "Password is required"),
 });
 
@@ -31,7 +31,7 @@ export function LoginForm() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      email: "",
+      emailUser: "",
       password: "",
     },
   });
@@ -39,11 +39,16 @@ export function LoginForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setLoading(true);
     try {
+      const fullEmail = `${values.emailUser}@crypto.agu`;
+
       // 1. Login API Call
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+        body: JSON.stringify({
+            email: fullEmail,
+            password: values.password
+        }),
       });
 
       const data = await res.json();
@@ -89,15 +94,22 @@ export function LoginForm() {
           <FieldGroup>
             <Controller
               control={form.control}
-              name="email"
+              name="emailUser"
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel>Email</FieldLabel>
-                  <Input 
-                    placeholder="alice@crypto.agu" 
-                    {...field} 
-                    aria-invalid={fieldState.invalid}
-                  />
+                  <FieldLabel>Email Username</FieldLabel>
+                  <div className="flex items-center">
+                    <Input 
+                        placeholder="alice" 
+                        {...field} 
+                        className="rounded-r-none"
+                        aria-invalid={fieldState.invalid}
+                        onChange={(e) => field.onChange(e.target.value.toLowerCase())}
+                    />
+                    <div className="bg-muted px-3 py-2 border border-l-0 rounded-r-md text-sm text-muted-foreground whitespace-nowrap h-9 flex items-center">
+                        @crypto.agu
+                    </div>
+                  </div>
                   <FieldError errors={[fieldState.error]} />
                 </Field>
               )}

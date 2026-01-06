@@ -36,19 +36,13 @@ import { useRouter } from "next/navigation";
 const composeSchema = z.object({
   recipient: z.string().email("Invalid email").refine(e => e.endsWith("@crypto.agu"), "Must conform to @crypto.agu"),
   subject: z.string().optional(),
-  // Checking Schema: Email { id, senderId, recipientId, encryptedContent, ... }
-  // I forgot to add 'subject' to the Schema! 
-  // For now, I'll put subject INSIDE the encrypted content: "Subject: ...\n\nBody"
-  // Or I can add it to schema. User requirements: "Email content is encrypted".
-  // Usually metadata like Subject IS encrypted to hide it, or plain.
-  // I will Prepend it to content for full security.
   message: z.string().min(1, "Message is required"),
 });
 
 export function ComposeDialog() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { user, privateKey } = useAuth(); // privateKey is the DECRYPTED one
+  const { user, privateKey } = useAuth();
   const router = useRouter();
 
   const form = useForm<z.infer<typeof composeSchema>>({
@@ -72,49 +66,32 @@ export function ComposeDialog() {
       const lookupData = await lookupRes.json();
       
       if (!lookupRes.ok || !lookupData.user) {
-        throw new Error("Recipient not found");
+        throw new Error("Recipient not found (" + values.recipient + ")");
       }
 
       const recipientPublicKey = lookupData.user.publicKey;
 
-      // 2. Prepare Content (Prepend Subject)
+      // 2. Prepare Content
       const fullContent = `Subject: ${values.subject || "(No Subject)"}\n\n${values.message}`;
 
-      // 3. Generate AES Key (Symmetric)
+      // 3. Generate AES Key
       const aesKey = generateAesKey();
 
-      // 4. Encrypt Content with AES
-      // Returns { encryptedContent, iv, authTag }
+      // 4. Encrypt Content (AES)
       const encryptedPkg = encryptContent(fullContent, aesKey);
-      
-      // We need to store AuthTag. My Schema has: encryptedContent, iv, ...
-      // I should have added authTag to Schema or combined it.
-      // In `lib/crypto` I said: "Format: saltHex:iv:authTag:encryptedContent" for Private Key.
-      // For Email, I should probably combine them similarly in `encryptedContent` field 
-      // OR update schema.
-      // Let's combine: IV is stored separately in DB? Yes `iv` column.
-      // But `authTag` is missing?
-      // I will APPEND authTag to the `encryptedContent` string for storage as "ContentBase64:TagBase64"
-      // Or just assume `encryptedContent` = `Ciphertext`.
-      // WITHOUT AUTHTAG, GCM DECRYPTION FAILS.
-      
-      // DECISION: Store `encryptedContent` as "Base64(Cipher)::(Base64(Tag))" 
-      // OR better, update `encryptContent` return type usage.
-      
       const storedContent = `${encryptedPkg.encryptedContent}:${encryptedPkg.authTag}`;
 
-      // 5. Encrypt AES Key with Recipient's Public Key (Confidentiality)
+      // 5. Encrypt AES Key (RSA)
       const encryptedAesKey = encryptAesKey(aesKey, recipientPublicKey);
 
-      // 6. Generate Hash & Sign (Integrity & Authenticity)
-      // Hash is of the ORIGINAL PLAIN TEXT
+      // 6. Sign Hash
       const { signature, hash } = generateSignatureAndHash(fullContent, privateKey);
 
-      // 7. Send payload
+      // 7. Send
       const payload = {
         senderId: user.id,
         recipientId: lookupData.user.id,
-        encryptedContent: storedContent, // Passing Tag combined
+        encryptedContent: storedContent,
         encryptedAesKey: encryptedAesKey,
         iv: encryptedPkg.iv,
         signature: signature,
@@ -132,7 +109,7 @@ export function ComposeDialog() {
       toast.success("Secure email sent!");
       setOpen(false);
       form.reset();
-      router.refresh(); // Refresh inbox
+      router.refresh();
 
     } catch (error: any) {
       toast.error(error.message);
@@ -162,7 +139,12 @@ export function ComposeDialog() {
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel>To (Email)</FieldLabel>
-                  <Input placeholder="bob@crypto.agu" {...field} />
+                  <Input 
+                    placeholder="bob@crypto.agu" 
+                    {...field} 
+                    // Enforce lowercase here too for better UX
+                    onChange={(e) => field.onChange(e.target.value.toLowerCase())}
+                  />
                   <FieldError errors={[fieldState.error]} />
                 </Field>
               )}

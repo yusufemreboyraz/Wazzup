@@ -22,7 +22,8 @@ import { useRouter } from "next/navigation";
 
 const formSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
-  email: z.string().email("Invalid email").refine(e => e.endsWith("@crypto.agu"), "Email must end with @crypto.agu"),
+  emailUser: z.string().min(1, "Username is required").regex(/^[a-z0-9.]+$/, "Only lowercase letters, numbers, and dots allowed"), 
+  // We validate 'emailUser' part only (lowercase enforced in UI but validated here too)
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
@@ -35,7 +36,7 @@ export function RegisterForm() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
-      email: "",
+      emailUser: "",
       password: "",
     },
   });
@@ -43,6 +44,8 @@ export function RegisterForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setLoading(true);
     try {
+      const fullEmail = `${values.emailUser}@crypto.agu`;
+
       // 1. Generate RSA Key Pair
       const keyPair = await generateKeyPair();
       
@@ -55,7 +58,7 @@ export function RegisterForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: values.name,
-          email: values.email,
+          email: fullEmail,
           password: values.password,
           publicKey: keyPair.publicKey,
           encryptedPrivateKey: encryptedPrivateKey,
@@ -112,15 +115,22 @@ export function RegisterForm() {
             />
             <Controller
               control={form.control}
-              name="email"
+              name="emailUser"
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel>Email</FieldLabel>
-                  <Input 
-                    placeholder="alice@crypto.agu" 
-                    {...field} 
-                    aria-invalid={fieldState.invalid}
-                  />
+                  <FieldLabel>Email Username</FieldLabel>
+                  <div className="flex items-center">
+                    <Input 
+                      placeholder="alice" 
+                      {...field}
+                      className="rounded-r-none" 
+                      aria-invalid={fieldState.invalid}
+                      onChange={(e) => field.onChange(e.target.value.toLowerCase())}
+                    />
+                    <div className="bg-muted px-3 py-2 border border-l-0 rounded-r-md text-sm text-muted-foreground whitespace-nowrap h-9 flex items-center">
+                        @crypto.agu
+                    </div>
+                  </div>
                   <FieldError errors={[fieldState.error]} />
                 </Field>
               )}
