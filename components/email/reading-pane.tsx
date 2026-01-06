@@ -11,8 +11,13 @@ import {
   MoreVertical, 
   Archive,
   Lock,
-  Loader2
+  Loader2,
+  Paperclip,
+  File as FileIcon,
+  Download
 } from "lucide-react";
+import { toast } from "sonner";
+import { decryptBinaryContent } from "@/lib/crypto";
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -106,6 +111,67 @@ export function ReadingPane({ email, onClose, onToggleStar, onToggleArchive, onD
                 </div>
             )}
         </div>
+
+        {/* Attachments */}
+        {email.attachments && email.attachments.length > 0 && email.decryptedAesKey && (
+            <div className="mt-8">
+                <h4 className="text-xs font-semibold text-muted-foreground mb-3 flex items-center gap-2">
+                    <Paperclip className="w-3 h-3" /> ATTACHMENTS ({email.attachments.length})
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {email.attachments.map((att: any) => (
+                        <div key={att.id} className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors group">
+                            <div className="h-10 w-10 rounded bg-background flex items-center justify-center border text-muted-foreground shrink-0">
+                                <FileIcon className="w-5 h-5" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <div className="text-sm font-medium truncate" title={att.filename}>
+                                    {att.filename}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                    {(att.size / 1024).toFixed(1)} KB
+                                </div>
+                            </div>
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8"
+                                onClick={() => {
+                                    try {
+                                        if(!email.decryptedAesKey) throw new Error("No Key");
+                                        
+                                        const [cipherText, authTag] = att.encryptedContent.split(":");
+                                        const decryptedBinary = decryptBinaryContent(cipherText, att.iv, email.decryptedAesKey, authTag);
+                                        
+                                        // Convert binary string to Uint8Array
+                                        const bytes = new Uint8Array(decryptedBinary.length);
+                                        for (let i = 0; i < decryptedBinary.length; i++) {
+                                            bytes[i] = decryptedBinary.charCodeAt(i);
+                                        }
+
+                                        const blob = new Blob([bytes], { type: att.contentType });
+                                        const url = URL.createObjectURL(blob);
+                                        const a = document.createElement('a');
+                                        a.href = url;
+                                        a.download = att.filename;
+                                        document.body.appendChild(a);
+                                        a.click();
+                                        document.body.removeChild(a);
+                                        URL.revokeObjectURL(url);
+                                        toast.success("Download started");
+                                    } catch(e) {
+                                        console.error(e);
+                                        toast.error("Decryption failed");
+                                    }
+                                }}
+                            >
+                                <Download className="w-4 h-4 mb-0.5" />
+                            </Button>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        )}
         
         {/* Security Badge */}
          <div className="mt-8 pt-4 border-t flex flex-col gap-2">
