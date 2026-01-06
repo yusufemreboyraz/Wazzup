@@ -68,7 +68,8 @@ export function ComposeDialog() {
     } else {
       setFiles([]);
     }
-  }, [open, composeOptions, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, composeOptions]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
