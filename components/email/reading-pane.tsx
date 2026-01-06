@@ -23,7 +23,8 @@ import {
   CheckCircle2,
   XCircle,
   Copy,
-  Check
+  Check,
+  ArrowLeft
 } from "lucide-react";
 import { toast } from "sonner";
 import { decryptBinaryContent } from "@/lib/crypto";
@@ -336,9 +337,10 @@ interface ReadingPaneProps {
   onToggleStar?: (id: string, current: boolean) => void;
   onToggleArchive?: (id: string, current: boolean) => void;
   onDelete?: (id: string) => void;
+  isMobile?: boolean;
 }
 
-export function ReadingPane({ email, onClose, onToggleStar, onToggleArchive, onDelete }: ReadingPaneProps) {
+export function ReadingPane({ email, onClose, onToggleStar, onToggleArchive, onDelete, isMobile = false }: ReadingPaneProps) {
   const { openCompose } = useCompose();
   const [showCertificate, setShowCertificate] = useState(false);
 
@@ -414,6 +416,16 @@ export function ReadingPane({ email, onClose, onToggleStar, onToggleArchive, onD
       <div className="flex flex-col h-full">
         {/* Header Toolbar */}
         <div className="flex items-center p-4 border-b gap-2">
+          {/* Mobile Back Button */}
+          {isMobile && onClose && (
+            <>
+              <Button variant="ghost" size="icon" onClick={onClose} title="Back to list">
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+              <Separator orientation="vertical" className="h-6 mx-1" />
+            </>
+          )}
+          
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" onClick={() => onToggleArchive?.(email.id, email.isArchived)} title={email.isArchived ? "Unarchive" : "Archive"}>
               <Archive className={`w-4 h-4 ${email.isArchived ? "text-primary fill-primary/10" : ""}`} />
@@ -427,7 +439,7 @@ export function ReadingPane({ email, onClose, onToggleStar, onToggleArchive, onD
             </Button>
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">
+            <span className="text-xs text-muted-foreground hidden sm:inline">
               {email.timestamp ? format(new Date(email.timestamp), "PP p") : ""}
             </span>
           </div>

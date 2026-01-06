@@ -72,6 +72,7 @@ export function MailDisplay({
   const [emails, setEmails] = useState<Email[]>(initialEmails);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null);
+  const [showMobileDetail, setShowMobileDetail] = useState(false);
   const { privateKey } = useAuth();
 
   // Sync props to state when new emails arrive
@@ -214,11 +215,16 @@ export function MailDisplay({
 
   const handleSelectEmail = (email: Email) => {
     setSelectedEmailId(email.id);
+    setShowMobileDetail(true);
     
     // Mark as read if not already (optimistic update)
     if (!email.read && !email.decryptedContent) {
       updateEmailState(email.id, { read: true });
     }
+  };
+
+  const handleCloseMobileDetail = () => {
+    setShowMobileDetail(false);
   };
 
   const handleToggleStar = async (id: string, current: boolean) => {
@@ -233,131 +239,163 @@ export function MailDisplay({
     }
   };
 
-  return (
-    <ResizablePanelGroup direction="horizontal" className="h-[calc(100vh-2rem)] rounded-lg border items-stretch shadow-sm bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
-      {/* List Pane */}
-      <ResizablePanel defaultSize={40} minSize={30} className="flex flex-col border-r">
-        <div className="flex items-center px-4 py-2 border-b h-[52px]">
-          <h1 className="text-xl font-bold mr-4">
-            {type === 'inbox' ? 'Inbox' : type === 'sent' ? 'Sent' : 'Archive'}
-          </h1>
-          <div className="bg-background/95 p-1 backdrop-blur supports-backdrop-filter:bg-background/60 w-full">
-            <form onSubmit={(e) => e.preventDefault()}>
-              <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input 
-                  placeholder="Search sender or recipient..." 
-                  className="pl-8 h-9" 
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-            </form>
-          </div>
+  // Mail List Component
+  const MailList = () => (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center px-4 py-2 border-b h-[52px]">
+        <h1 className="text-xl font-bold mr-4">
+          {type === 'inbox' ? 'Inbox' : type === 'sent' ? 'Sent' : 'Archive'}
+        </h1>
+        <div className="bg-background/95 p-1 backdrop-blur supports-backdrop-filter:bg-background/60 w-full">
+          <form onSubmit={(e) => e.preventDefault()}>
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Search sender or recipient..." 
+                className="pl-8 h-9" 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+          </form>
         </div>
-        
-        <ScrollArea className="h-full">
-          <div className="flex flex-col gap-0 p-0">
-            {loading ? (
-              <div className="flex items-center justify-center p-8 text-muted-foreground">
-                <Loader2 className="animate-spin w-4 h-4 mr-2"/>Syncing...
-              </div>
-            ) : filteredEmails.length === 0 ? (
-              <div className="text-center p-8 text-muted-foreground text-sm">
-                No messages found matching filter.
-              </div>
-            ) : (
-              <>
-                {filteredEmails.map((email) => (
-                  <div
-                    key={email.id}
-                    className={cn(
-                      "flex w-full cursor-pointer flex-col items-start gap-2 border-b p-3 text-left text-sm transition-all hover:bg-accent/50",
-                      selectedEmailId === email.id && "bg-accent"
-                    )}
-                    onClick={() => handleSelectEmail(email)}
-                  >
-                    <div className="flex w-full flex-col gap-1">
-                      <div className="flex items-center">
-                        <div className="flex items-center gap-2">
-                          <div className={cn("font-semibold", !email.read && "text-foreground")}>
-                            {type === 'sent' ? email.recipient.name : email.sender.name}
-                          </div>
-                          {!email.read && (
-                            <span className="flex h-2 w-2 rounded-full bg-blue-600" />
-                          )}
+      </div>
+      
+      <ScrollArea className="h-full">
+        <div className="flex flex-col gap-0 p-0">
+          {loading ? (
+            <div className="flex items-center justify-center p-8 text-muted-foreground">
+              <Loader2 className="animate-spin w-4 h-4 mr-2"/>Syncing...
+            </div>
+          ) : filteredEmails.length === 0 ? (
+            <div className="text-center p-8 text-muted-foreground text-sm">
+              No messages found matching filter.
+            </div>
+          ) : (
+            <>
+              {filteredEmails.map((email) => (
+                <div
+                  key={email.id}
+                  className={cn(
+                    "flex w-full cursor-pointer flex-col items-start gap-2 border-b p-3 text-left text-sm transition-all hover:bg-accent/50",
+                    selectedEmailId === email.id && "bg-accent"
+                  )}
+                  onClick={() => handleSelectEmail(email)}
+                >
+                  <div className="flex w-full flex-col gap-1">
+                    <div className="flex items-center">
+                      <div className="flex items-center gap-2">
+                        <div className={cn("font-semibold", !email.read && "text-foreground")}>
+                          {type === 'sent' ? email.recipient.name : email.sender.name}
                         </div>
-                        <div className={cn("ml-auto text-xs", selectedEmailId === email.id ? "text-foreground" : "text-muted-foreground")}>
-                          {formatDistanceToNow(new Date(email.timestamp), { addSuffix: true })}
-                        </div>
+                        {!email.read && (
+                          <span className="flex h-2 w-2 rounded-full bg-blue-600" />
+                        )}
                       </div>
-                      <div className="text-xs font-medium line-clamp-1">
-                        Secure Message
-                      </div> 
-                      <div className="line-clamp-2 text-xs text-muted-foreground">
-                        {email.decryptedContent ? email.decryptedContent.substring(0, 100) : "End-to-end encrypted message..."}
+                      <div className={cn("ml-auto text-xs", selectedEmailId === email.id ? "text-foreground" : "text-muted-foreground")}>
+                        {formatDistanceToNow(new Date(email.timestamp), { addSuffix: true })}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleToggleStar(email.id, email.isStarred);
-                        }}
-                        className="hover:bg-muted p-0.5 rounded"
-                      >
-                        <Star className={cn("w-3 h-3", email.isStarred ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground")} />
-                      </button>
-                      {email.isStarred && <Badge variant="secondary" className="px-1 py-0 text-[10px] bg-yellow-100 text-yellow-700 hover:bg-yellow-100">Starred</Badge>}
-                      <Badge variant="outline" className="px-1 py-0 text-[10px]">
-                        {type === 'sent' ? 'Sent' : 'Inbox'}
-                      </Badge>
+                    <div className="text-xs font-medium line-clamp-1">
+                      Secure Message
+                    </div> 
+                    <div className="line-clamp-2 text-xs text-muted-foreground">
+                      {email.decryptedContent ? email.decryptedContent.substring(0, 100) : "End-to-end encrypted message..."}
                     </div>
                   </div>
-                ))}
-                
-                {/* Load More Button */}
-                {pagination && pagination.hasMore && onLoadMore && (
-                  <div className="p-4 border-t">
-                    <Button 
-                      variant="outline" 
-                      className="w-full gap-2"
-                      onClick={onLoadMore}
-                      disabled={loadingMore}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleStar(email.id, email.isStarred);
+                      }}
+                      className="hover:bg-muted p-0.5 rounded"
                     >
-                      {loadingMore ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4" />
-                      )}
-                      Load More ({pagination.totalCount - (pagination.page * pagination.pageSize)} remaining)
-                    </Button>
+                      <Star className={cn("w-3 h-3", email.isStarred ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground")} />
+                    </button>
+                    {email.isStarred && <Badge variant="secondary" className="px-1 py-0 text-[10px] bg-yellow-100 text-yellow-700 hover:bg-yellow-100">Starred</Badge>}
+                    <Badge variant="outline" className="px-1 py-0 text-[10px]">
+                      {type === 'sent' ? 'Sent' : 'Inbox'}
+                    </Badge>
                   </div>
-                )}
-                
-                {/* Pagination Info */}
-                {pagination && (
-                  <div className="p-2 text-center text-xs text-muted-foreground border-t">
-                    Showing {Math.min(pagination.page * pagination.pageSize, pagination.totalCount)} of {pagination.totalCount} emails
-                  </div>
-                )}
-              </>
-            )}
+                </div>
+              ))}
+              
+              {/* Load More Button */}
+              {pagination && pagination.hasMore && onLoadMore && (
+                <div className="p-4 border-t">
+                  <Button 
+                    variant="outline" 
+                    className="w-full gap-2"
+                    onClick={onLoadMore}
+                    disabled={loadingMore}
+                  >
+                    {loadingMore ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4" />
+                    )}
+                    Load More ({pagination.totalCount - (pagination.page * pagination.pageSize)} remaining)
+                  </Button>
+                </div>
+              )}
+              
+              {/* Pagination Info */}
+              {pagination && (
+                <div className="p-2 text-center text-xs text-muted-foreground border-t">
+                  Showing {Math.min(pagination.page * pagination.pageSize, pagination.totalCount)} of {pagination.totalCount} emails
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </ScrollArea>
+    </div>
+  );
+
+  return (
+    <>
+      {/* Desktop View - ResizablePanel */}
+      <div className="hidden md:block h-full">
+        <ResizablePanelGroup direction="horizontal" className="h-[calc(100vh-2rem)] rounded-lg border items-stretch shadow-sm bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
+          {/* List Pane */}
+          <ResizablePanel defaultSize={40} minSize={30} className="flex flex-col border-r">
+            <MailList />
+          </ResizablePanel>
+          
+          <ResizableHandle />
+          
+          {/* Reading Pane */}
+          <ResizablePanel defaultSize={60}>
+            <ReadingPane 
+              email={selectedEmail}
+              onToggleStar={handleToggleStar}
+              onToggleArchive={handleToggleArchive}
+              onDelete={handleDelete}
+            />
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      </div>
+
+      {/* Mobile View - Full Screen Toggle */}
+      <div className="md:hidden h-full flex flex-col">
+        {!showMobileDetail ? (
+          <div className="h-full rounded-lg border shadow-sm bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
+            <MailList />
           </div>
-        </ScrollArea>
-      </ResizablePanel>
-      
-      <ResizableHandle />
-      
-      {/* Reading Pane */}
-      <ResizablePanel defaultSize={60}>
-        <ReadingPane 
-          email={selectedEmail}
-          onToggleStar={handleToggleStar}
-          onToggleArchive={handleToggleArchive}
-          onDelete={handleDelete}
-        />
-      </ResizablePanel>
-    </ResizablePanelGroup>
+        ) : (
+          <div className="h-full rounded-lg border shadow-sm bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
+            <ReadingPane 
+              email={selectedEmail}
+              onToggleStar={handleToggleStar}
+              onToggleArchive={handleToggleArchive}
+              onDelete={handleDelete}
+              onClose={handleCloseMobileDetail}
+              isMobile={true}
+            />
+          </div>
+        )}
+      </div>
+    </>
   );
 }
