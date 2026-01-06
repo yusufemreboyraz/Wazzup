@@ -16,7 +16,7 @@ function createWindow() {
         autoHideMenuBar: true,
     });
 
-    const startUrl = process.env.ELECTRON_START_URL || 'http://localhost:3000';
+    const startUrl = process.env.ELECTRON_START_URL || 'https://wazzup-seven.vercel.app';
 
     const loadApp = () => {
         mainWindow.loadURL(startUrl).catch(() => {
