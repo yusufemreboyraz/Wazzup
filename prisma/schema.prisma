@@ -18,6 +18,9 @@ model User {
 
   sentEmails     Email[] @relation("SentEmails")
   receivedEmails Email[] @relation("ReceivedEmails")
+
+  @@index([email])
+  @@index([createdAt])
 }
 
 model Email {
@@ -43,6 +46,15 @@ model Email {
   recipient User @relation("ReceivedEmails", fields: [recipientId], references: [id])
 
   attachments Attachment[]
+
+  // Performance indexes
+  @@index([senderId])
+  @@index([recipientId])
+  @@index([recipientId, isArchived]) // Composite index for inbox queries
+  @@index([senderId, timestamp])     // For sent folder sorting
+  @@index([recipientId, timestamp])  // For inbox sorting
+  @@index([timestamp])
+  @@index([isStarred])
 }
 
 model Attachment {
@@ -57,4 +69,6 @@ model Attachment {
   iv               String
 
   createdAt DateTime @default(now())
+
+  @@index([emailId])
 }
