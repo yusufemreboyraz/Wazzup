@@ -21,7 +21,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 const formSchema = z.object({
-  username: z.string().min(2, "Username must be at least 2 characters"),
+  name: z.string().min(2, "Name must be at least 2 characters"),
+  email: z.string().email("Invalid email").refine(e => e.endsWith("@crypto.agu"), "Email must end with @crypto.agu"),
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
@@ -33,7 +34,8 @@ export function RegisterForm() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      username: "",
+      name: "",
+      email: "",
       password: "",
     },
   });
@@ -41,10 +43,10 @@ export function RegisterForm() {
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setLoading(true);
     try {
-      // 1. Generate RSA Key Pair (Client-side)
+      // 1. Generate RSA Key Pair
       const keyPair = await generateKeyPair();
       
-      // 2. Encrypt Private Key with Password
+      // 2. Encrypt Private Key
       const encryptedPrivateKey = encryptPrivateKey(keyPair.privateKey, values.password);
 
       // 3. Send to Server
@@ -52,7 +54,8 @@ export function RegisterForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          username: values.username,
+          name: values.name,
+          email: values.email,
           password: values.password,
           publicKey: keyPair.publicKey,
           encryptedPrivateKey: encryptedPrivateKey,
@@ -65,10 +68,11 @@ export function RegisterForm() {
         throw new Error(data.error || "Registration failed");
       }
 
-      // 4. Auto-login on success
+      // 4. Auto-login
       login({
         id: data.user.id,
-        username: data.user.username,
+        name: data.user.name,
+        email: data.user.email,
         publicKey: keyPair.publicKey,
         encryptedPrivateKey: encryptedPrivateKey
       }, keyPair.privateKey);
@@ -91,14 +95,29 @@ export function RegisterForm() {
       <CardContent>
         <form onSubmit={form.handleSubmit(onSubmit)}>
           <FieldGroup>
-            <Controller
+             <Controller
               control={form.control}
-              name="username"
+              name="name"
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel>Username</FieldLabel>
+                  <FieldLabel>Full Name</FieldLabel>
                   <Input 
-                    placeholder="alice" 
+                    placeholder="Alice Doe" 
+                    {...field} 
+                    aria-invalid={fieldState.invalid}
+                  />
+                  <FieldError errors={[fieldState.error]} />
+                </Field>
+              )}
+            />
+            <Controller
+              control={form.control}
+              name="email"
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel>Email</FieldLabel>
+                  <Input 
+                    placeholder="alice@crypto.agu" 
                     {...field} 
                     aria-invalid={fieldState.invalid}
                   />

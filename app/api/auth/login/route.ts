@@ -5,15 +5,15 @@ import bcrypt from "bcryptjs";
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        const { username, password } = body;
+        const { email, password } = body;
 
-        if (!username || !password) {
+        if (!email || !password) {
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
         }
 
         // Find user
         const user = await prisma.user.findUnique({
-            where: { username },
+            where: { email },
         });
 
         if (!user) {
@@ -28,13 +28,12 @@ export async function POST(req: Request) {
         }
 
         // Return user info AND encrypted private key
-        // The client will use the password (which they still have in memory from the form)
-        // to decrypt the encryptedPrivateKey.
         return NextResponse.json({
             success: true,
             user: {
                 id: user.id,
-                username: user.username,
+                name: user.name,
+                email: user.email,
                 publicKey: user.publicKey,
                 encryptedPrivateKey: user.encryptedPrivateKey,
             },

@@ -57,8 +57,8 @@ export async function GET(req: Request) {
         const emails = await prisma.email.findMany({
             where: whereClause,
             include: {
-                sender: { select: { username: true, publicKey: true } },
-                recipient: { select: { username: true } },
+                sender: { select: { name: true, email: true, publicKey: true } },
+                recipient: { select: { name: true, email: true } },
             },
             orderBy: { timestamp: "desc" },
         });

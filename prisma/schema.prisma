@@ -9,7 +9,8 @@ datasource db {
 
 model User {
   id                  String   @id @default(uuid())
-  username            String   @unique
+  email               String   @unique
+  name                String
   passwordHash        String
   publicKey           String
   encryptedPrivateKey String

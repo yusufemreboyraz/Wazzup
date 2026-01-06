@@ -34,8 +34,8 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
 const composeSchema = z.object({
-  recipient: z.string().min(1, "Recipient is required"),
-  subject: z.string().optional(), // Subject is usually part of content or separate. Plan said "Subject" can be separate. Wait, DB doesn't have Subject column in Schema?
+  recipient: z.string().email("Invalid email").refine(e => e.endsWith("@crypto.agu"), "Must conform to @crypto.agu"),
+  subject: z.string().optional(),
   // Checking Schema: Email { id, senderId, recipientId, encryptedContent, ... }
   // I forgot to add 'subject' to the Schema! 
   // For now, I'll put subject INSIDE the encrypted content: "Subject: ...\n\nBody"
@@ -68,7 +68,7 @@ export function ComposeDialog() {
       }
 
       // 1. Lookup Recipient to get Public Key
-      const lookupRes = await fetch(`/api/users/lookup?username=${values.recipient}`);
+      const lookupRes = await fetch(`/api/users/lookup?email=${values.recipient}`);
       const lookupData = await lookupRes.json();
       
       if (!lookupRes.ok || !lookupData.user) {
@@ -161,8 +161,8 @@ export function ComposeDialog() {
               name="recipient"
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel>To (Username)</FieldLabel>
-                  <Input placeholder="bob" {...field} />
+                  <FieldLabel>To (Email)</FieldLabel>
+                  <Input placeholder="bob@crypto.agu" {...field} />
                   <FieldError errors={[fieldState.error]} />
                 </Field>
               )}

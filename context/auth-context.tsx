@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 
 interface User {
   id: string;
-  username: string;
+  email: string; // ID
+  name: string; // Display Name
   publicKey?: string;
   encryptedPrivateKey?: string;
 }

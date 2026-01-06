@@ -20,7 +20,7 @@ import { toast } from "sonner";
 import Link from "next/link";
 
 const formSchema = z.object({
-  username: z.string().min(1, "Username is required"),
+  email: z.string().email("Invalid email").min(1, "Email is required"),
   password: z.string().min(1, "Password is required"),
 });
 
@@ -31,7 +31,7 @@ export function LoginForm() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      username: "",
+      email: "",
       password: "",
     },
   });
@@ -89,12 +89,12 @@ export function LoginForm() {
           <FieldGroup>
             <Controller
               control={form.control}
-              name="username"
+              name="email"
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel>Username</FieldLabel>
+                  <FieldLabel>Email</FieldLabel>
                   <Input 
-                    placeholder="alice" 
+                    placeholder="alice@crypto.agu" 
                     {...field} 
                     aria-invalid={fieldState.invalid}
                   />

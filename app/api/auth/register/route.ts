@@ -5,19 +5,24 @@ import bcrypt from "bcryptjs";
 export async function POST(req: Request) {
     try {
         const body = await req.json();
-        const { username, password, publicKey, encryptedPrivateKey } = body;
+        const { name, email, password, publicKey, encryptedPrivateKey } = body;
 
-        if (!username || !password || !publicKey || !encryptedPrivateKey) {
+        if (!name || !email || !password || !publicKey || !encryptedPrivateKey) {
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+        }
+
+        // Validate Email Domain
+        if (!email.endsWith("@crypto.agu")) {
+            return NextResponse.json({ error: "Email must end with @crypto.agu" }, { status: 400 });
         }
 
         // Check if user exists
         const existingUser = await prisma.user.findUnique({
-            where: { username },
+            where: { email },
         });
 
         if (existingUser) {
-            return NextResponse.json({ error: "Username already exists" }, { status: 409 });
+            return NextResponse.json({ error: "Email already exists" }, { status: 409 });
         }
 
         // Hash password for authentication
@@ -26,7 +31,8 @@ export async function POST(req: Request) {
         // Create user
         const user = await prisma.user.create({
             data: {
-                username,
+                name,
+                email,
                 passwordHash,
                 publicKey,
                 encryptedPrivateKey,
@@ -38,7 +44,8 @@ export async function POST(req: Request) {
             success: true,
             user: {
                 id: user.id,
-                username: user.username,
+                name: user.name,
+                email: user.email,
             },
         });
     } catch (error) {

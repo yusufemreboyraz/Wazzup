@@ -30,8 +30,8 @@ import {
 
 interface Email {
   id: string;
-  sender: { username: string; publicKey: string };
-  recipient: { username: string };
+  sender: { name: string; email: string; publicKey: string };
+  recipient: { name: string; email: string };
   encryptedContent: string;
   encryptedAesKey: string;
   iv: string;
@@ -179,7 +179,7 @@ export function EmailList({ type = "inbox" }: { type: "inbox" | "sent" }) {
                 onClick={() => setSelectedEmail(email)}
               >
                 <TableCell className="font-medium">
-                    {type === "sent" ? email.recipient.username : email.sender.username}
+                    {type === "sent" ? `${email.recipient.name} <${email.recipient.email}>` : `${email.sender.name} <${email.sender.email}>`}
                 </TableCell>
                 <TableCell>
                     <Badge variant="outline" className="gap-1">
@@ -200,7 +200,7 @@ export function EmailList({ type = "inbox" }: { type: "inbox" | "sent" }) {
             <DialogHeader>
                 <DialogTitle>Secure Message</DialogTitle>
                 <DialogDescription>
-                    From: <span className="font-bold">{selectedEmail?.sender.username}</span>
+                    From: <span className="font-bold">{selectedEmail?.sender.name} ({selectedEmail?.sender.email})</span>
                 </DialogDescription>
             </DialogHeader>
             

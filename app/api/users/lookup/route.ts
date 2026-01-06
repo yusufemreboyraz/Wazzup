@@ -3,19 +3,20 @@ import { NextResponse } from "next/server";
 
 export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
-    const username = searchParams.get("username");
+    const email = searchParams.get("email");
 
-    if (!username) {
-        return NextResponse.json({ error: "Username required" }, { status: 400 });
+    if (!email) {
+        return NextResponse.json({ error: "Email required" }, { status: 400 });
     }
 
     try {
         const user = await prisma.user.findUnique({
-            where: { username },
+            where: { email },
             select: {
                 id: true,
-                username: true,
-                publicKey: true, // Needed for encryption
+                name: true, // Send name too
+                email: true,
+                publicKey: true,
             },
         });
 

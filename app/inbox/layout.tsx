@@ -26,7 +26,8 @@ export default function InboxLayout({
       <div className="w-[200px] border-r flex flex-col p-4 gap-4">
         <div className="font-bold text-xl px-2">Wazzup</div>
         <div className="text-xs text-muted-foreground px-2 break-all">
-          {user.username}
+          <div className="font-medium text-foreground">{user.name}</div>
+          {user.email}
         </div>
         
         <ComposeDialog />

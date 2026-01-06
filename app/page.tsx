@@ -15,7 +15,7 @@ export default function Home() {
   if (user) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-4">
-        <h1 className="text-2xl font-bold">Welcome, {user.username}</h1>
+        <h1 className="text-2xl font-bold">Welcome, {user.name} ({user.email})</h1>
         <Button onClick={() => window.location.href = '/inbox'}>Go to Inbox</Button>
       </div>
     );
