@@ -7,7 +7,7 @@ import Link from "next/link";
 import { ComposeDialog } from "@/components/email/compose-dialog";
 import { useCompose } from "@/context/compose-context";
 
-import { Inbox, Send, LogOut, RefreshCw, Hexagon, Archive, Moon, Sun, Menu } from "lucide-react";
+import { Inbox, Send, LogOut, RefreshCw, Hexagon, Archive, Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
@@ -21,11 +21,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Sheet,
-  SheetContent,
-  SheetTitle,
-} from "@/components/ui/sheet";
 
 export default function InboxLayout({
   children,
@@ -38,7 +33,6 @@ export default function InboxLayout({
   const { openCompose } = useCompose();
   const [counts, setCounts] = useState({ inbox: 0 });
   const { setTheme, theme } = useTheme();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -80,136 +74,91 @@ export default function InboxLayout({
       { icon: Archive, label: "Archive", href: "/inbox/archive", count: 0 },
   ];
 
-  // Sidebar Content Component
-  const SidebarContent = ({ showRefresh = true }: { showRefresh?: boolean }) => (
-    <>
-      {/* Brand Header */}
-      <div className="h-[52px] flex items-center justify-between px-4 border-b shrink-0">
-         <div className="flex items-center gap-2 font-bold text-lg text-primary">
-            <Hexagon className="w-5 h-5 fill-current" />
-            Wazzup
-         </div>
-         {showRefresh && (
+  return (
+    <div className="flex h-screen w-full bg-background overflow-hidden">
+      {/* Sidebar */}
+      <div className="w-[220px] border-r flex flex-col bg-muted/30 h-full">
+        
+        {/* Brand Header */}
+        <div className="h-[52px] flex items-center justify-between px-4 border-b shrink-0">
+           <div className="flex items-center gap-2 font-bold text-lg text-primary">
+              <Hexagon className="w-5 h-5 fill-current" />
+              Wazzup
+           </div>
            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={handleRefresh} title="Refresh">
                <RefreshCw className="w-4 h-4" />
            </Button>
-         )}
-      </div>
+        </div>
 
-      {/* Compose Action */}
-      <div className="p-4 shrink-0 space-y-2">
-          <Button onClick={() => { openCompose(); setMobileMenuOpen(false); }} className="w-full gap-2 shadow-sm font-semibold h-11" size="lg">
-              <Send className="w-4 h-4" /> New Message
-          </Button>
-      </div>
+        {/* Compose Action */}
+        <div className="p-4 shrink-0 space-y-2">
+            <Button onClick={() => openCompose()} className="w-full gap-2 shadow-sm font-semibold h-11" size="lg">
+                <Send className="w-4 h-4" /> New Message
+            </Button>
+            <ComposeDialog />
+        </div>
 
-      {/* Navigation */}
-      <div className="flex-1 px-2 space-y-1 overflow-y-auto">
-          {navItems.map((item) => (
-              <Link 
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={cn(
-                      "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors",
-                       pathname === item.href 
-                          ? "bg-primary/10 text-primary" 
-                          : "text-muted-foreground hover:bg-muted"
-                  )}
-              >
-                  <item.icon className="w-4 h-4" />
-                  {item.label}
-                  {item.count > 0 && item.label === "Inbox" && (
-                      <span className="ml-auto text-xs bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full">
-                          {item.count}
-                      </span>
-                  )}
-              </Link>
-          ))}
-      </div>
+        {/* Navigation */}
+        <div className="flex-1 px-2 space-y-1 overflow-y-auto">
+            {navItems.map((item) => (
+                <Link 
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                        "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                         pathname === item.href 
+                            ? "bg-primary/10 text-primary" 
+                            : "text-muted-foreground hover:bg-muted"
+                    )}
+                >
+                    <item.icon className="w-4 h-4" />
+                    {item.label}
+                    {item.count > 0 && item.label === "Inbox" && (
+                        <span className="ml-auto text-xs bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full">
+                            {item.count}
+                        </span>
+                    )}
+                </Link>
+            ))}
+        </div>
 
-      {/* User Footer */}
-      <div className="p-4 border-t bg-background/50 shrink-0">
-           <div className="flex flex-col gap-2">
-               <DropdownMenu>
-                   <DropdownMenuTrigger asChild>
-                      <button className="flex items-center gap-3 w-full text-left hover:bg-muted/50 p-2 rounded-md transition-colors outline-none focus-visible:ring-1">
-                          <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary shrink-0">
-                              {user.name ? user.name.substring(0, 2).toUpperCase() : "??"}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium truncate">{user.name}</p>
-                              <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-                          </div>
-                      </button>
-                   </DropdownMenuTrigger>
-                   <DropdownMenuContent align="start" className="w-[190px]">
-                       <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                       <DropdownMenuSeparator />
-                       <DropdownMenuItem onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
-                           {theme === "dark" ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
-                           {theme === "dark" ? "Light Mode" : "Dark Mode"}
-                       </DropdownMenuItem>
-                       <DropdownMenuSeparator />
-                       <DropdownMenuItem className="text-red-500 focus:text-red-500" onClick={handleLogout}>
-                           <LogOut className="mr-2 h-4 w-4" /> Log out
-                       </DropdownMenuItem>
-                   </DropdownMenuContent>
-               </DropdownMenu>
-           </div>
-      </div>
-    </>
-  );
+        {/* User Footer */}
+        <div className="p-4 border-t bg-background/50 shrink-0">
+             <div className="flex flex-col gap-2">
+                 <DropdownMenu>
+                     <DropdownMenuTrigger asChild>
+                        <button className="flex items-center gap-3 w-full text-left hover:bg-muted/50 p-2 rounded-md transition-colors outline-none focus-visible:ring-1">
+                            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary shrink-0">
+                                {user.name ? user.name.substring(0, 2).toUpperCase() : "??"}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{user.name}</p>
+                                <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                            </div>
+                        </button>
+                     </DropdownMenuTrigger>
+                     <DropdownMenuContent align="start" className="w-[190px]">
+                         <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                         <DropdownMenuSeparator />
+                         <DropdownMenuItem onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
+                             {theme === "dark" ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
+                             {theme === "dark" ? "Light Mode" : "Dark Mode"}
+                         </DropdownMenuItem>
+                         <DropdownMenuSeparator />
+                         <DropdownMenuItem className="text-red-500 focus:text-red-500" onClick={handleLogout}>
+                             <LogOut className="mr-2 h-4 w-4" /> Log out
+                         </DropdownMenuItem>
+                     </DropdownMenuContent>
+                 </DropdownMenu>
+             </div>
+        </div>
 
-  return (
-    <div className="flex h-screen w-full bg-background overflow-hidden">
-      {/* Desktop Sidebar */}
-      <div className="hidden md:flex w-[220px] border-r flex-col bg-muted/30 h-full">
-        <SidebarContent />
       </div>
-
-      {/* Mobile Menu Sheet */}
-      <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-        <SheetContent side="left" className="p-0 w-[220px]">
-          <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
-          <div className="flex flex-col bg-muted/30 h-full">
-            <SidebarContent showRefresh={false} />
-          </div>
-        </SheetContent>
-      </Sheet>
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 bg-background h-full overflow-hidden">
-        {/* Mobile Header with Burger Menu */}
-        <div className="md:hidden flex items-center justify-between px-4 h-[52px] border-b bg-background shrink-0">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => setMobileMenuOpen(true)}
-            className="h-9 w-9"
-          >
-            <Menu className="w-5 h-5" />
-          </Button>
-          <div className="flex items-center gap-2 font-bold text-lg text-primary">
-            <Hexagon className="w-5 h-5 fill-current" />
-            Wazzup
-          </div>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-9 w-9 text-muted-foreground" 
-            onClick={handleRefresh} 
-            title="Refresh"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </Button>
-        </div>
-        
         {children}
       </div>
-
-      {/* Compose Dialog - Single Instance */}
-      <ComposeDialog />
     </div>
   );
 }

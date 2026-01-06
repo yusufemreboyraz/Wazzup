@@ -9,8 +9,8 @@ import { ThemeProvider } from "@/components/theme-provider";
 const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Wazzup - Secure Mailing",
-  description: "End-to-end encrypted email application",
+  title: "Wazzup - Secure Messaging",
+  description: "End-to-end encrypted messaging application",
 };
 
 export default function RootLayout({
