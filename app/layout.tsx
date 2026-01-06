@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { JetBrains_Mono } from "next/font/google"; // Changed font
 import "./globals.css";
 import { AuthProvider } from "@/context/auth-context";
+import { ComposeProvider } from "@/context/compose-context"; // Added context
 import { Toaster } from "@/components/ui/sonner";
 
-const inter = Inter({ subsets: ["latin"] });
+const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"] }); // Configured font
 
 export const metadata: Metadata = {
   title: "Wazzup - Secure Messaging",
@@ -18,9 +19,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body className={jetbrainsMono.className}>
         <AuthProvider>
-          {children}
+          <ComposeProvider>
+             {children}
+          </ComposeProvider>
         </AuthProvider>
         <Toaster />
       </body>

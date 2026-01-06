@@ -24,6 +24,7 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
+import { useCompose } from "@/context/compose-context";
 
 // Helper to get initials
 function getInitials(name: string) {
@@ -45,6 +46,8 @@ interface ReadingPaneProps {
 }
 
 export function ReadingPane({ email, onClose, onToggleStar, onToggleArchive, onDelete }: ReadingPaneProps) {
+  const { openCompose } = useCompose();
+
   if (!email) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-8 text-center">
@@ -193,7 +196,17 @@ export function ReadingPane({ email, onClose, onToggleStar, onToggleArchive, onD
 
       {/* Footer Actions */}
       <div className="p-4 border-t bg-muted/20">
-        <Button className="w-full sm:w-auto gap-2">
+        <Button 
+            className="w-full sm:w-auto gap-2"
+            onClick={() => {
+                if (!email) return;
+                openCompose({
+                    recipient: email.sender?.email,
+                    subject: `Re: ${email.sender?.name}`, 
+                    message: `\n\n\n--- Original Message from ${email.sender?.name} ---\n${email.decryptedContent || ''}`
+                });
+            }}
+        >
             <Reply className="w-4 h-4" /> Reply
         </Button>
       </div>

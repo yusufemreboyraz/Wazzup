@@ -5,12 +5,12 @@ import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ComposeDialog } from "@/components/email/compose-dialog";
+import { useCompose } from "@/context/compose-context";
 
 import { Inbox, Send, LogOut, RefreshCw, Hexagon, Archive } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation";
 
-// ... (imports)
 import { useEffect, useState } from "react";
 import {
   DropdownMenu,
@@ -29,6 +29,7 @@ export default function InboxLayout({
   const { user, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const { openCompose } = useCompose();
   const [counts, setCounts] = useState({ inbox: 0 });
 
   useEffect(() => {
@@ -47,13 +48,12 @@ export default function InboxLayout({
     };
 
     fetchCounts();
-    // Poll every 30s? Or just rely on page load for now.
+    // Poll every 15s
     const interval = setInterval(fetchCounts, 15000);
     return () => clearInterval(interval);
   }, [user]);
 
   if (!user) {
-    // Ideally this redirects in middleware or useEffect
     return <div className="flex items-center justify-center h-screen">Loading...</div>;
   }
 
@@ -89,7 +89,10 @@ export default function InboxLayout({
         </div>
 
         {/* Compose Action */}
-        <div className="p-4 shrink-0">
+        <div className="p-4 shrink-0 space-y-2">
+            <Button onClick={() => openCompose()} className="w-full gap-2 shadow-sm font-semibold h-11" size="lg">
+                <Send className="w-4 h-4" /> New Message
+            </Button>
             <ComposeDialog />
         </div>
 

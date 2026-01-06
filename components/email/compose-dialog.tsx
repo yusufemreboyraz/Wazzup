@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Loader2, Send, Paperclip, Minimize2, X } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
+import { useCompose } from "@/context/compose-context";
 import { 
   generateAesKey, 
   encryptContent, 
@@ -23,13 +24,10 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
-  DialogClose
 } from "@/components/ui/dialog";
 import {
   Field,
   FieldLabel,
-  FieldError,
   FieldGroup,
 } from "@/components/ui/field";
 import { toast } from "sonner";
@@ -43,7 +41,7 @@ const composeSchema = z.object({
 });
 
 export function ComposeDialog() {
-  const [open, setOpen] = useState(false);
+  const { open, setOpen, composeOptions } = useCompose();
   const [loading, setLoading] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const { user, privateKey } = useAuth();
@@ -57,6 +55,21 @@ export function ComposeDialog() {
       message: "",
     },
   });
+
+  // Sync context options to form
+  useEffect(() => {
+      if (open) {
+          form.reset({
+              recipient: composeOptions.recipient || "",
+              subject: composeOptions.subject || "",
+              message: composeOptions.message || ""
+          });
+      } else {
+          setFiles([]);
+          // Don't reset form immediately on close to avoid flicker, or do?
+          // form.reset(); 
+      }
+  }, [open, composeOptions, form]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files.length > 0) {
@@ -157,12 +170,7 @@ export function ComposeDialog() {
   }
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if(!v) { form.reset(); setFiles([]); } }}>
-      <DialogTrigger asChild>
-        <Button className="w-full gap-2 shadow-sm font-semibold h-11" size="lg">
-            <Send className="w-4 h-4" /> New Message
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden gap-0">
         <DialogHeader className="px-6 py-4 bg-muted/40 border-b flex flex-row items-center justify-between space-y-0">
           <div className="flex flex-col gap-1">
