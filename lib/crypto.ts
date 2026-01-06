@@ -7,7 +7,7 @@ import forge from 'node-forge';
  * 2. AES-GCM Encryption/Decryption (Confidentiality)
  * 3. RSA-OAEP Key Wrapping/Unwrapping (Confidentiality for the AES Key)
  * 4. SHA-256 Hashing + RSA-PSS Signing (Integrity & Authenticity)
- * 5. Password Hashing (handled by bcryptjs in auth, but we can add helpers here if needed)
+ * 5. PBKDF2 for Private Key Encryption (Client-side)
  */
 
 // --- Types ---
@@ -109,6 +109,40 @@ export const decryptContent = (
     return decipher.output.toString(); // Defaults to utf8
 };
 
+
+// --- 2.5 PBKDF2 & Private Key Encryption ---
+
+export const deriveKeyFromPassword = (password: string, saltHex: string): string => {
+    const salt = forge.util.hexToBytes(saltHex);
+    // PBKDF2 defaults: SHA1 usually in forge, let's try to specify SHA256 if possible or stick to default.
+    // Forge PBKDF2: forge.pkcs5.pbkdf2(password, salt, numIterations, keyLength, [md])
+    // We want 32 bytes (256 bits) for AES-256
+    const keyMap = forge.pkcs5.pbkdf2(password, salt, 10000, 32, forge.md.sha256.create());
+    return forge.util.bytesToHex(keyMap);
+};
+
+export const encryptPrivateKey = (privateKeyPem: string, password: string): string => {
+    const salt = forge.random.getBytesSync(16);
+    const saltHex = forge.util.bytesToHex(salt);
+    const derivedKeyHex = deriveKeyFromPassword(password, saltHex);
+
+    const encryptedPkg = encryptContent(privateKeyPem, derivedKeyHex);
+
+    // Format: saltHex:iv:authTag:encryptedContent
+    return `${saltHex}:${encryptedPkg.iv}:${encryptedPkg.authTag}:${encryptedPkg.encryptedContent}`;
+};
+
+export const decryptPrivateKey = (encryptedBundle: string, password: string): string => {
+    const parts = encryptedBundle.split(':');
+    if (parts.length !== 4) throw new Error("Invalid encrypted private key format");
+
+    const [saltHex, iv, authTag, encryptedContent] = parts;
+    const derivedKeyHex = deriveKeyFromPassword(password, saltHex);
+
+    // We need to pass authTag manually to our decryptContent or modify it.
+    // My decryptContent takes (content, iv, key, tag).
+    return decryptContent(encryptedContent, iv, derivedKeyHex, authTag);
+};
 
 // --- 3. RSA Key Wrapping (AES Key Encryption) ---
 
