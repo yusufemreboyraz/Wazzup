@@ -16,6 +16,7 @@ import {
 import { ReadingPane } from "./reading-pane";
 import { decryptContent, decryptAesKey, verifySignature } from "@/lib/crypto";
 import { useAuth } from "@/context/auth-context";
+import { toast } from "sonner";
 
 interface Attachment {
   id: string;
@@ -47,7 +48,7 @@ interface Email {
 
 interface MailDisplayProps {
     emails: Email[];
-    type: "inbox" | "sent";
+    type: "inbox" | "sent" | "archive";
     loading: boolean;
 }
 
@@ -63,16 +64,49 @@ export function MailDisplay({ emails: initialEmails, type, loading }: MailDispla
       setEmails(initialEmails);
   }
 
+  const handleToggleArchive = (id: string, current: boolean) => {
+      const newState = !current;
+      updateEmailState(id, { isArchived: newState });
+      updateServerStatus(id, { isArchived: newState });
+      
+      // If we are in inbox and archive it, it disappears (handled by filter)
+      // If we are in archive and unarchive it, it should disappear from archive view
+      if (type === 'archive') {
+         // Optionally remove immediately from view or keep until refresh
+         // Let's hide it immediately to be consistent
+      }
+  };
+
+  const handleDelete = async (id: string) => {
+      if (!confirm("Are you sure you want to permanently delete this email?")) return;
+      
+      try {
+          const res = await fetch(`/api/emails?id=${id}`, { method: "DELETE" });
+          if(res.ok) {
+              setEmails(prev => prev.filter(e => e.id !== id));
+              if (selectedEmailId === id) setSelectedEmailId(null);
+              toast.success("Email deleted");
+          } else {
+              throw new Error("Failed to delete");
+          }
+      } catch (err) {
+          toast.error("Could not delete email");
+      }
+  };
+
   const filteredEmails = emails.filter(email => {
+      // Inbox: Show ONLY if NOT archived
       if (type === 'inbox' && email.isArchived) return false;
       
+      // Archive: Show ONLY if archived
+      if (type === 'archive' && !email.isArchived) return false;
+
       if (!searchQuery) return true;
       const lowerQuery = searchQuery.toLowerCase();
       const senderName = email.sender.name.toLowerCase();
       const senderEmail = email.sender.email.toLowerCase();
       const recipientName = email.recipient.name.toLowerCase();
       
-      // Since content is encrypted, we can only search metadata
       return senderName.includes(lowerQuery) || 
              senderEmail.includes(lowerQuery) || 
              recipientName.includes(lowerQuery);
@@ -156,18 +190,14 @@ export function MailDisplay({ emails: initialEmails, type, loading }: MailDispla
       updateServerStatus(id, { isStarred: newState });
   };
 
-  const handleToggleArchive = (id: string, current: boolean) => {
-      const newState = !current;
-      updateEmailState(id, { isArchived: newState });
-      updateServerStatus(id, { isArchived: newState });
-  };
-
   return (
     <ResizablePanelGroup direction="horizontal" className="h-[calc(100vh-2rem)] rounded-lg border items-stretch shadow-sm bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         {/* List Pane */}
       <ResizablePanel defaultSize={40} minSize={30} className="flex flex-col border-r">
         <div className="flex items-center px-4 py-2 border-b h-[52px]">
-            <h1 className="text-xl font-bold mr-4">{type === 'inbox' ? 'Inbox' : 'Sent'}</h1>
+            <h1 className="text-xl font-bold mr-4">
+                {type === 'inbox' ? 'Inbox' : type === 'sent' ? 'Sent' : 'Archive'}
+            </h1>
             <div className="bg-background/95 p-1 backdrop-blur supports-[backdrop-filter]:bg-background/60 w-full">
                 <form onSubmit={(e) => e.preventDefault()}>
                   <div className="relative">
@@ -250,7 +280,8 @@ export function MailDisplay({ emails: initialEmails, type, loading }: MailDispla
         <ReadingPane 
             email={selectedEmail}
             onToggleStar={handleToggleStar}
-            onToggleArchive={handleToggleArchive} 
+            onToggleArchive={handleToggleArchive}
+            onDelete={handleDelete}
         />
       </ResizablePanel>
 

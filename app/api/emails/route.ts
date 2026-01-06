@@ -95,3 +95,22 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
     }
 }
+
+export async function DELETE(req: Request) {
+    const { searchParams } = new URL(req.url);
+    const emailId = searchParams.get("id");
+
+    if (!emailId) {
+        return NextResponse.json({ error: "Email ID required" }, { status: 400 });
+    }
+
+    try {
+        await prisma.email.delete({
+            where: { id: emailId },
+        });
+        return NextResponse.json({ success: true });
+    } catch (error) {
+        console.error("Delete error:", error);
+        return NextResponse.json({ error: "Failed to delete" }, { status: 500 });
+    }
+}

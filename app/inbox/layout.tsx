@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ComposeDialog } from "@/components/email/compose-dialog";
-import { Inbox, Send, LogOut, RefreshCw, Hexagon } from "lucide-react";
+
+import { Inbox, Send, LogOut, RefreshCw, Hexagon, Archive } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation";
 
@@ -68,6 +69,7 @@ export default function InboxLayout({
   const navItems = [
       { icon: Inbox, label: "Inbox", href: "/inbox", count: counts.inbox },
       { icon: Send, label: "Sent", href: "/inbox/sent", count: 0 },
+      { icon: Archive, label: "Archive", href: "/inbox/archive", count: 0 },
   ];
 
   return (
