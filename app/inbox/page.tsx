@@ -13,7 +13,9 @@ export default function InboxPage() {
   useEffect(() => {
     if (!user) return;
 
-    fetch(`/api/emails?userId=${user.id}&type=inbox`)
+    if (!user) return;
+
+    fetch(`/api/emails?userId=${user.id}&type=inbox&isArchived=false`)
       .then((res) => res.json())
       .then((data) => {
         if (data.emails) setEmails(data.emails);

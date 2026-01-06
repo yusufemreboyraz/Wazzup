@@ -9,6 +9,17 @@ import { Inbox, Send, LogOut, RefreshCw, Hexagon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation";
 
+// ... (imports)
+import { useEffect, useState } from "react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
 export default function InboxLayout({
   children,
 }: {
@@ -17,6 +28,28 @@ export default function InboxLayout({
   const { user, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const [counts, setCounts] = useState({ inbox: 0 });
+
+  useEffect(() => {
+    if (!user) return;
+    
+    const fetchCounts = async () => {
+        try {
+            const res = await fetch(`/api/users/stats?userId=${user.id}`);
+            const data = await res.json();
+            if (data.inboxCount !== undefined) {
+                setCounts({ inbox: data.inboxCount });
+            }
+        } catch (err) {
+            console.error("Failed to fetch counts", err);
+        }
+    };
+
+    fetchCounts();
+    // Poll every 30s? Or just rely on page load for now.
+    const interval = setInterval(fetchCounts, 15000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   if (!user) {
     // Ideally this redirects in middleware or useEffect
@@ -29,11 +62,11 @@ export default function InboxLayout({
   };
 
   const handleRefresh = () => {
-    window.location.reload(); // Simple refresh for now
+    window.location.reload(); 
   };
 
   const navItems = [
-      { icon: Inbox, label: "Inbox", href: "/inbox", count: 0 }, // Mock count could be fetched
+      { icon: Inbox, label: "Inbox", href: "/inbox", count: counts.inbox },
       { icon: Send, label: "Sent", href: "/inbox/sent", count: 0 },
   ];
 
@@ -43,11 +76,14 @@ export default function InboxLayout({
       <div className="w-[220px] border-r flex flex-col bg-muted/30 h-full">
         
         {/* Brand Header */}
-        <div className="h-[52px] flex items-center px-4 border-b shrink-0">
+        <div className="h-[52px] flex items-center justify-between px-4 border-b shrink-0">
            <div className="flex items-center gap-2 font-bold text-lg text-primary">
               <Hexagon className="w-5 h-5 fill-current" />
               Wazzup
            </div>
+           <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={handleRefresh} title="Refresh">
+               <RefreshCw className="w-4 h-4" />
+           </Button>
         </div>
 
         {/* Compose Action */}
@@ -81,23 +117,27 @@ export default function InboxLayout({
 
         {/* User Footer */}
         <div className="p-4 border-t bg-background/50 shrink-0">
-             <div className="flex items-center gap-3 mb-4">
-                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
-                    {user.name ? user.name.substring(0, 2).toUpperCase() : "??"}
-                </div>
-                <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{user.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-                </div>
-             </div>
-             
-             <div className="flex items-center gap-2">
-                 <Button variant="outline" size="sm" className="w-full justify-start gap-2" onClick={handleRefresh}>
-                    <RefreshCw className="w-3 h-3" /> Refresh
-                 </Button>
-                 <Button variant="ghost" size="icon" className="shrink-0" onClick={handleLogout} title="Logout">
-                    <LogOut className="w-4 h-4 text-muted-foreground" />
-                 </Button>
+             <div className="flex flex-col gap-2">
+                 <DropdownMenu>
+                     <DropdownMenuTrigger asChild>
+                        <button className="flex items-center gap-3 w-full text-left hover:bg-muted/50 p-2 rounded-md transition-colors outline-none focus-visible:ring-1">
+                            <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary shrink-0">
+                                {user.name ? user.name.substring(0, 2).toUpperCase() : "??"}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium truncate">{user.name}</p>
+                                <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                            </div>
+                        </button>
+                     </DropdownMenuTrigger>
+                     <DropdownMenuContent align="start" className="w-[190px]">
+                         <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                         <DropdownMenuSeparator />
+                         <DropdownMenuItem className="text-red-500 focus:text-red-500" onClick={handleLogout}>
+                             <LogOut className="mr-2 h-4 w-4" /> Log out
+                         </DropdownMenuItem>
+                     </DropdownMenuContent>
+                 </DropdownMenu>
              </div>
         </div>
 

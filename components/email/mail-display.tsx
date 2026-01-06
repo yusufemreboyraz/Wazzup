@@ -17,6 +17,15 @@ import { ReadingPane } from "./reading-pane";
 import { decryptContent, decryptAesKey, verifySignature } from "@/lib/crypto";
 import { useAuth } from "@/context/auth-context";
 
+interface Attachment {
+  id: string;
+  filename: string;
+  contentType: string;
+  size: number;
+  encryptedContent: string;
+  iv: string;
+}
+
 interface Email {
   id: string;
   sender: { name: string; email: string; publicKey: string };
@@ -31,7 +40,9 @@ interface Email {
   isStarred: boolean;
   isArchived: boolean;
   decryptedContent?: string; // Client-side only
+  decryptedAesKey?: string; // Client-side only
   integrityVerified?: boolean; // Client-side only
+  attachments?: Attachment[];
 }
 
 interface MailDisplayProps {
@@ -42,6 +53,7 @@ interface MailDisplayProps {
 
 export function MailDisplay({ emails: initialEmails, type, loading }: MailDisplayProps) {
   const [emails, setEmails] = useState<Email[]>(initialEmails);
+  const [searchQuery, setSearchQuery] = useState("");
   const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null);
   const { privateKey } = useAuth(); // Decrypted private key
 
@@ -50,6 +62,21 @@ export function MailDisplay({ emails: initialEmails, type, loading }: MailDispla
       // Simple sync for now, in real app use useEffect
       setEmails(initialEmails);
   }
+
+  const filteredEmails = emails.filter(email => {
+      if (type === 'inbox' && email.isArchived) return false;
+      
+      if (!searchQuery) return true;
+      const lowerQuery = searchQuery.toLowerCase();
+      const senderName = email.sender.name.toLowerCase();
+      const senderEmail = email.sender.email.toLowerCase();
+      const recipientName = email.recipient.name.toLowerCase();
+      
+      // Since content is encrypted, we can only search metadata
+      return senderName.includes(lowerQuery) || 
+             senderEmail.includes(lowerQuery) || 
+             recipientName.includes(lowerQuery);
+  });
 
   const selectedEmail = emails.find(e => e.id === selectedEmailId);
 
@@ -100,7 +127,12 @@ export function MailDisplay({ emails: initialEmails, type, loading }: MailDispla
                  email.sender.publicKey
              );
 
-             updateEmailState(email.id, { read: true, decryptedContent: decryptedText, integrityVerified: isValid });
+             updateEmailState(email.id, { 
+                 read: true, 
+                 decryptedContent: decryptedText, 
+                 decryptedAesKey: aesKeyHex,
+                 integrityVerified: isValid 
+             });
 
              // Mark as read in DB if not already
              if (!email.read) {
@@ -137,10 +169,15 @@ export function MailDisplay({ emails: initialEmails, type, loading }: MailDispla
         <div className="flex items-center px-4 py-2 border-b h-[52px]">
             <h1 className="text-xl font-bold mr-4">{type === 'inbox' ? 'Inbox' : 'Sent'}</h1>
             <div className="bg-background/95 p-1 backdrop-blur supports-[backdrop-filter]:bg-background/60 w-full">
-                <form>
+                <form onSubmit={(e) => e.preventDefault()}>
                   <div className="relative">
                     <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                    <Input placeholder="Search" className="pl-8 h-9" />
+                    <Input 
+                        placeholder="Search sender or recipient..." 
+                        className="pl-8 h-9" 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                    />
                   </div>
                 </form>
             </div>
@@ -150,10 +187,10 @@ export function MailDisplay({ emails: initialEmails, type, loading }: MailDispla
             <div className="flex flex-col gap-0 p-0">
                 {loading ? (
                     <div className="flex items-center justify-center p-8 text-muted-foreground"><Loader2 className="animate-spin w-4 h-4 mr-2"/>Syncing...</div>
-                ) : emails.length === 0 ? (
-                    <div className="text-center p-8 text-muted-foreground text-sm">No messages found.</div>
+                ) : filteredEmails.length === 0 ? (
+                    <div className="text-center p-8 text-muted-foreground text-sm">No messages found matching filter.</div>
                 ) : (
-                    emails.map((email) => (
+                    filteredEmails.map((email) => (
                         <div
                             key={email.id}
                             className={cn(

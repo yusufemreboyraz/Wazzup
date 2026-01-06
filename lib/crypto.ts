@@ -109,6 +109,52 @@ export const decryptContent = (
     return decipher.output.toString(); // Defaults to utf8
 };
 
+// --- 2.1 AES-GCM Encryption (Binary/Attachment) ---
+
+export const encryptBinaryContent = (contentBytes: string, aesKeyHex: string): EncryptedPackage => {
+    const keyBlob = forge.util.hexToBytes(aesKeyHex);
+    const iv = forge.random.getBytesSync(12);
+
+    const cipher = forge.cipher.createCipher('AES-GCM', keyBlob);
+    cipher.start({ iv: iv });
+    // 'raw' encoding for binary string
+    cipher.update(forge.util.createBuffer(contentBytes));
+    cipher.finish();
+
+    const encrypted = cipher.output.getBytes();
+    const tag = cipher.mode.tag.getBytes();
+
+    return {
+        encryptedContent: forge.util.encode64(encrypted),
+        iv: forge.util.encode64(iv),
+        authTag: forge.util.encode64(tag),
+    };
+};
+
+export const decryptBinaryContent = (
+    encryptedContentBase64: string,
+    ivBase64: string,
+    aesKeyHex: string,
+    authTagBase64: string
+): string => {
+    const key = forge.util.hexToBytes(aesKeyHex);
+    const iv = forge.util.decode64(ivBase64);
+    const encryptedBytes = forge.util.decode64(encryptedContentBase64);
+    const buffer = forge.util.createBuffer(encryptedBytes);
+    const decipher = forge.cipher.createDecipher('AES-GCM', key);
+    const tag = forge.util.createBuffer(forge.util.decode64(authTagBase64));
+
+    decipher.start({ iv: iv, tag: tag });
+    decipher.update(buffer);
+    const success = decipher.finish();
+
+    if (!success) {
+        throw new Error("Decryption failed: Integrity check failed.");
+    }
+
+    return decipher.output.getBytes(); // Return raw binary string
+};
+
 
 // --- 2.5 PBKDF2 & Private Key Encryption ---
 

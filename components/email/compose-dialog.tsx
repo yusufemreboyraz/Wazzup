@@ -10,7 +10,8 @@ import {
   generateAesKey, 
   encryptContent, 
   encryptAesKey, 
-  generateSignatureAndHash 
+  generateSignatureAndHash,
+  encryptBinaryContent
 } from "@/lib/crypto";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,6 +45,7 @@ const composeSchema = z.object({
 export function ComposeDialog() {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [files, setFiles] = useState<File[]>([]);
   const { user, privateKey } = useAuth();
   const router = useRouter();
 
@@ -56,6 +58,16 @@ export function ComposeDialog() {
     },
   });
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files.length > 0) {
+          setFiles(prev => [...prev, ...Array.from(e.target.files as FileList)]);
+      }
+  };
+
+  const removeFile = (index: number) => {
+      setFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
   async function onSubmit(values: z.infer<typeof composeSchema>) {
     setLoading(true);
     try {
@@ -63,7 +75,7 @@ export function ComposeDialog() {
         throw new Error("You must be logged in to send emails");
       }
 
-      // 1. Lookup Recipient to get Public Key
+      // 1. Lookup Recipient
       const lookupRes = await fetch(`/api/users/lookup?email=${values.recipient}`);
       const lookupData = await lookupRes.json();
       
@@ -83,6 +95,28 @@ export function ComposeDialog() {
       const encryptedPkg = encryptContent(fullContent, aesKey);
       const storedContent = `${encryptedPkg.encryptedContent}:${encryptedPkg.authTag}`;
 
+      // 4.5 Encrypt Attachments
+      const processedAttachments = [];
+      for (const file of files) {
+          const arrayBuffer = await file.arrayBuffer();
+          // Convert ArrayBuffer to binary string for forge
+          let binaryString = "";
+          const bytes = new Uint8Array(arrayBuffer);
+          const len = bytes.byteLength;
+          for (let i = 0; i < len; i++) {
+              binaryString += String.fromCharCode(bytes[i]);
+          }
+          
+          const encAtt = encryptBinaryContent(binaryString, aesKey);
+          processedAttachments.push({
+              filename: file.name,
+              contentType: file.type,
+              size: file.size,
+              encryptedContent: `${encAtt.encryptedContent}:${encAtt.authTag}`, // Keeping same format
+              iv: encAtt.iv
+          });
+      }
+
       // 5. Encrypt AES Key (RSA)
       const encryptedAesKey = encryptAesKey(aesKey, recipientPublicKey);
 
@@ -98,6 +132,7 @@ export function ComposeDialog() {
         iv: encryptedPkg.iv,
         signature: signature,
         messageHash: hash,
+        attachments: processedAttachments
       };
 
       const sendRes = await fetch("/api/emails", {
@@ -111,7 +146,8 @@ export function ComposeDialog() {
       toast.success("Secure email sent!");
       setOpen(false);
       form.reset();
-      router.refresh(); // Refresh page to maybe show in 'Sent' if we were there
+      setFiles([]);
+      router.refresh(); 
 
     } catch (error: any) {
       toast.error(error.message);
@@ -121,7 +157,7 @@ export function ComposeDialog() {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if(!v) { form.reset(); setFiles([]); } }}>
       <DialogTrigger asChild>
         <Button className="w-full gap-2 shadow-sm font-semibold h-11" size="lg">
             <Send className="w-4 h-4" /> New Message
@@ -133,7 +169,6 @@ export function ComposeDialog() {
              <DialogTitle>New Message</DialogTitle>
              <DialogDescription>End-to-End Encrypted Communication</DialogDescription>
           </div>
-          {/* Custom Close? Default does exist */}
         </DialogHeader>
         
         <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col">
@@ -158,7 +193,6 @@ export function ComposeDialog() {
                             {...field} 
                             onChange={(e) => field.onChange(e.target.value.toLowerCase())}
                         />
-                        {/* Error displayed as toast or below? FieldError handles it if we keep structure */}
                         </Field>
                     )}
                     />
@@ -187,19 +221,32 @@ export function ComposeDialog() {
                     <Field data-invalid={fieldState.invalid}>
                     <Textarea 
                         placeholder="Write something secure..." 
-                        className="min-h-[250px] border-0 focus-visible:ring-0 resize-none p-0 shadow-none text-base" 
+                        className="min-h-[200px] border-0 focus-visible:ring-0 resize-none p-0 shadow-none text-base" 
                         {...field} 
                     />
                     </Field>
                 )}
                 />
+
+                {files.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                        {files.map((f, i) => (
+                            <div key={i} className="flex items-center gap-2 bg-muted px-2 py-1 rounded text-xs">
+                                <Paperclip className="w-3 h-3" />
+                                <span className="max-w-[100px] truncate">{f.name}</span>
+                                <button type="button" onClick={() => removeFile(i)} className="hover:text-destructive"><X className="w-3 h-3"/></button>
+                            </div>
+                        ))}
+                    </div>
+                )}
             </div>
             
             <DialogFooter className="px-6 py-4 border-t bg-muted/40 sm:justify-between items-center">
                  <div className="flex gap-2">
-                     <Button variant="ghost" size="icon" type="button" title="Attach (Not Implemented)">
+                     <label className="cursor-pointer inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 hover:bg-accent hover:text-accent-foreground h-9 w-9">
                         <Paperclip className="w-4 h-4 text-muted-foreground" />
-                     </Button>
+                        <input type="file" className="hidden" onChange={handleFileChange} multiple />
+                     </label>
                  </div>
                  <div className="flex gap-2">
                     <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Discard</Button>

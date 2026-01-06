@@ -11,7 +11,8 @@ export async function POST(req: Request) {
             encryptedAesKey,
             iv,
             signature,
-            messageHash
+            messageHash,
+            attachments // Array of { filename, contentType, size, encryptedContent, iv }
         } = body;
 
         if (!senderId || !recipientId || !encryptedContent || !encryptedAesKey || !iv || !signature || !messageHash) {
@@ -27,7 +28,19 @@ export async function POST(req: Request) {
                 iv,
                 signature,
                 messageHash,
+                attachments: {
+                    create: attachments?.map((att: any) => ({
+                        filename: att.filename,
+                        contentType: att.contentType,
+                        size: att.size,
+                        encryptedContent: att.encryptedContent,
+                        iv: att.iv
+                    })) || []
+                }
             },
+            include: {
+                attachments: true
+            }
         });
 
         return NextResponse.json({ success: true, email });
@@ -41,17 +54,29 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get("userId");
     const type = searchParams.get("type") || "inbox"; // 'inbox' or 'sent'
+    const isArchived = searchParams.get("isArchived"); // 'true' or 'false'
 
     if (!userId) {
         return NextResponse.json({ error: "UserId required" }, { status: 400 });
     }
 
     try {
-        let whereClause = {};
+        let whereClause: any = {};
         if (type === "sent") {
             whereClause = { senderId: userId };
         } else {
             whereClause = { recipientId: userId };
+            // For inbox, we default to showing non-archived unless specified
+            if (isArchived === 'true') {
+                whereClause.isArchived = true;
+            } else if (isArchived === 'false' || !isArchived) {
+                // Default to false for inbox if not specified, 
+                // BUT wait, maybe we want to see all? 
+                // Requirement: "Archive Filtering" -> implies hiding.
+                // Let's enforce: if type=inbox and isArchived not passed, exclude archived?
+                // Usually standard behavior.
+                whereClause.isArchived = false;
+            }
         }
 
         const emails = await prisma.email.findMany({
@@ -59,6 +84,7 @@ export async function GET(req: Request) {
             include: {
                 sender: { select: { name: true, email: true, publicKey: true } },
                 recipient: { select: { name: true, email: true } },
+                attachments: true,
             },
             orderBy: { timestamp: "desc" },
         });

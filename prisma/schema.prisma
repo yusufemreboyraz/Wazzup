@@ -41,4 +41,20 @@ model Email {
 
   sender    User @relation("SentEmails", fields: [senderId], references: [id])
   recipient User @relation("ReceivedEmails", fields: [recipientId], references: [id])
+
+  attachments Attachment[]
+}
+
+model Attachment {
+  id      String @id @default(uuid())
+  emailId String
+  email   Email  @relation(fields: [emailId], references: [id], onDelete: Cascade)
+
+  filename         String
+  contentType      String
+  size             Int
+  encryptedContent String // Base64 encoded encrypted content
+  iv               String
+
+  createdAt DateTime @default(now())
 }
