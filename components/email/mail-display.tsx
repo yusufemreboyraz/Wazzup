@@ -3,44 +3,19 @@
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { Search, Loader2 } from "lucide-react";
-
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { Star } from "lucide-react";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
-} from "@/components/ui/resizable-panel"; // Install shadcn/ui-resizable wrapper if not present, otherwise use raw
+} from "@/components/ui/resizable";
 import { ReadingPane } from "./reading-pane";
-import { generateKeyPair, decryptPrivateKey, decryptContent, importPublicKey, verifySignature } from "@/lib/crypto";
+import { decryptContent, decryptAesKey, verifySignature } from "@/lib/crypto";
 import { useAuth } from "@/context/auth-context";
-
-// Note: Shadcn Resizable relies on 'react-resizable-panels'.
-// If you haven't added the UI component via shadcn CLI, you might need to use raw 'react-resizable-panels' or add the file manually.
-// Assuming we need to implement the Shadcn wrapper quickly:
-import * as ResizablePrimitive from "react-resizable-panels";
-
-// --- Minimal Inline Resizable Components (in case not in ui folder) ---
-const ResizablePanelGroupLocal = ({ className, ...props }: React.ComponentProps<typeof ResizablePrimitive.PanelGroup>) => (
-  <ResizablePrimitive.PanelGroup
-    className={cn("flex h-full w-full data-[panel-group-direction=vertical]:flex-col", className)}
-    {...props}
-  />
-)
-const ResizablePanelLocal = ResizablePrimitive.Panel
-const ResizableHandleLocal = ({ className, ...props }: React.ComponentProps<typeof ResizablePrimitive.PanelResizeHandle>) => (
-  <ResizablePrimitive.PanelResizeHandle
-    className={cn(
-      "relative flex w-px items-center justify-center bg-border after:absolute after:inset-y-0 after:left-1/2 after:w-1 after:-translate-x-1/2 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-1 data-[panel-group-direction=vertical]:h-px data-[panel-group-direction=vertical]:w-full data-[panel-group-direction=vertical]:after:left-0 data-[panel-group-direction=vertical]:after:h-1 data-[panel-group-direction=vertical]:after:w-full data-[panel-group-direction=vertical]:after:-translate-y-1/2 data-[panel-group-direction=vertical]:after:translate-x-0 [&[data-panel-group-direction=vertical]>div]:rotate-90",
-      className
-    )}
-    {...props}
-  />
-)
-// ----------------------------------------------------------------------
-
 
 interface Email {
   id: string;
@@ -54,6 +29,7 @@ interface Email {
   timestamp: string;
   read: boolean;
   isStarred: boolean;
+  isArchived: boolean;
   decryptedContent?: string; // Client-side only
   integrityVerified?: boolean; // Client-side only
 }
@@ -77,6 +53,22 @@ export function MailDisplay({ emails: initialEmails, type, loading }: MailDispla
 
   const selectedEmail = emails.find(e => e.id === selectedEmailId);
 
+  const updateEmailState = (id: string, updates: Partial<Email>) => {
+      setEmails(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e));
+  };
+
+  const updateServerStatus = async (id: string, updates: any) => {
+      try {
+          await fetch("/api/emails/status", {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ emailId: id, status: updates }),
+          });
+      } catch (err) {
+          console.error("Failed to update status", err);
+      }
+  };
+
   const handleSelectEmail = async (email: Email) => {
       setSelectedEmailId(email.id);
       
@@ -85,8 +77,6 @@ export function MailDisplay({ emails: initialEmails, type, loading }: MailDispla
           try {
              // 1. Decrypt AES Key using Private Key
              // Note: In Sent folder, we encrypt the AES key for the recipient, not ourselves.
-             // So we CANNOT decrypt Sent emails unless we stored a copy of AES Key encrypted for ourselves.
-             // LIMITATION: Wazzup v1 Sent folder items are readable only by recipient.
              
              if (type === "sent") {
                  const mockContent = `[Secure Message Sent]\n\n(You cannot read this because the key was encrypted only for the recipient: ${email.recipient.name})`;
@@ -94,49 +84,56 @@ export function MailDisplay({ emails: initialEmails, type, loading }: MailDispla
                  return;
              }
 
-             const decryptedAesKey = await window.crypto.subtle.decrypt(
-                 { name: "RSA-OAEP" },
-                 privateKey,
-                 Buffer.from(email.encryptedAesKey, "base64")
-             );
-             
-             // Import AES Key
-             const aesKey = await window.crypto.subtle.importKey(
-                 "raw",
-                 decryptedAesKey,
-                 "AES-GCM",
-                 true,
-                 ["decrypt"]
-             );
+             // Use node-forge based helper from lib/crypto (Synchronous usually, but defined as string return)
+             const aesKeyHex = decryptAesKey(email.encryptedAesKey, privateKey);
 
              // 2. Decrypt Content
              const [cipherText, authTag] = email.encryptedContent.split(":");
-             const decryptedText = await decryptContent(cipherText, authTag, email.iv, aesKey);
+             
+             // Pass hex key directly to decryptContent
+             const decryptedText = decryptContent(cipherText, email.iv, aesKeyHex, authTag);
 
              // 3. Verify Signature
-             const isValid = await verifySignature(
+             const isValid = verifySignature(
                  decryptedText, 
                  email.signature, 
                  email.sender.publicKey
              );
 
-             updateEmailState(email.id, { decryptedContent: decryptedText, integrityVerified: isValid });
+             updateEmailState(email.id, { read: true, decryptedContent: decryptedText, integrityVerified: isValid });
+
+             // Mark as read in DB if not already
+             if (!email.read) {
+                 updateServerStatus(email.id, { read: true });
+             }
 
           } catch (err) {
               console.error(err);
               updateEmailState(email.id, { decryptedContent: "[Decryption Failed]", integrityVerified: false });
           }
+      } else if (!email.read) {
+          // If already decrypted but not read (unlikely but possible), mark as read
+          updateEmailState(email.id, { read: true });
+          updateServerStatus(email.id, { read: true });
       }
   };
 
-  const updateEmailState = (id: string, updates: Partial<Email>) => {
-      setEmails(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e));
+  const handleToggleStar = (id: string, current: boolean) => {
+      const newState = !current;
+      updateEmailState(id, { isStarred: newState });
+      updateServerStatus(id, { isStarred: newState });
+  };
+
+  const handleToggleArchive = (id: string, current: boolean) => {
+      const newState = !current;
+      updateEmailState(id, { isArchived: newState });
+      updateServerStatus(id, { isArchived: newState });
   };
 
   return (
-    <ResizablePanelGroupLocal direction="horizontal" className="h-[calc(100vh-2rem)] rounded-lg border items-stretch shadow-sm bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <ResizablePanelGroup direction="horizontal" className="h-[calc(100vh-2rem)] rounded-lg border items-stretch shadow-sm bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         {/* List Pane */}
-      <ResizablePanelLocal defaultSize={40} minSize={30} className="flex flex-col border-r">
+      <ResizablePanel defaultSize={40} minSize={30} className="flex flex-col border-r">
         <div className="flex items-center px-4 py-2 border-b h-[52px]">
             <h1 className="text-xl font-bold mr-4">{type === 'inbox' ? 'Inbox' : 'Sent'}</h1>
             <div className="bg-background/95 p-1 backdrop-blur supports-[backdrop-filter]:bg-background/60 w-full">
@@ -157,10 +154,10 @@ export function MailDisplay({ emails: initialEmails, type, loading }: MailDispla
                     <div className="text-center p-8 text-muted-foreground text-sm">No messages found.</div>
                 ) : (
                     emails.map((email) => (
-                        <button
+                        <div
                             key={email.id}
                             className={cn(
-                                "flex flex-col items-start gap-2 border-b p-3 text-left text-sm transition-all hover:bg-accent/50",
+                                "flex w-full cursor-pointer flex-col items-start gap-2 border-b p-3 text-left text-sm transition-all hover:bg-accent/50",
                                 selectedEmailId === email.id && "bg-accent"
                             )}
                             onClick={() => handleSelectEmail(email)}
@@ -188,29 +185,38 @@ export function MailDisplay({ emails: initialEmails, type, loading }: MailDispla
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleToggleStar(email.id, email.isStarred);
+                                    }}
+                                    className="hover:bg-muted p-0.5 rounded"
+                                >
+                                     <Star className={cn("w-3 h-3", email.isStarred ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground")} />
+                                </button>
                                 {email.isStarred && <Badge variant="secondary" className="px-1 py-0 text-[10px] bg-yellow-100 text-yellow-700 hover:bg-yellow-100">Starred</Badge>}
                                 <Badge variant="outline" className="px-1 py-0 text-[10px]">
                                     {type === 'sent' ? 'Sent' : 'Inbox'}
                                 </Badge>
                             </div>
-                        </button>
+                        </div>
                     ))
                 )}
             </div>
         </ScrollArea>
-      </ResizablePanelLocal>
+      </ResizablePanel>
       
-      <ResizableHandleLocal />
+      <ResizableHandle />
       
       {/* Reading Pane */}
-      <ResizablePanelLocal defaultSize={60}>
-        <ReadingPane email={selectedEmail} />
-      </ResizablePanelLocal>
+      <ResizablePanel defaultSize={60}>
+        <ReadingPane 
+            email={selectedEmail}
+            onToggleStar={handleToggleStar}
+            onToggleArchive={handleToggleArchive} 
+        />
+      </ResizablePanel>
 
-    </ResizablePanelGroupLocal>
+    </ResizablePanelGroup>
   );
 }
-
-// Node.js Buffer polyfill for browser environment usually handled by webpack/next
-// But we used 'Buffer.from' in code. If it fails, we need manual hex conversion or use 'node-forge' utils.
-// Next.js usually polyfills Buffer.

@@ -34,9 +34,12 @@ function getInitials(name: string) {
 interface ReadingPaneProps {
   email: any | null;
   onClose?: () => void; // For mobile
+  onToggleStar?: (id: string, current: boolean) => void;
+  onToggleArchive?: (id: string, current: boolean) => void;
+  onDelete?: (id: string) => void;
 }
 
-export function ReadingPane({ email, onClose }: ReadingPaneProps) {
+export function ReadingPane({ email, onClose, onToggleStar, onToggleArchive, onDelete }: ReadingPaneProps) {
   if (!email) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-8 text-center">
@@ -54,14 +57,14 @@ export function ReadingPane({ email, onClose }: ReadingPaneProps) {
       {/* Header Toolbar */}
       <div className="flex items-center p-4 border-b gap-2">
         <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" disabled>
-                <Archive className="w-4 h-4" />
+            <Button variant="ghost" size="icon" onClick={() => onToggleArchive?.(email.id, email.isArchived)} title={email.isArchived ? "Unarchive" : "Archive"}>
+                <Archive className={`w-4 h-4 ${email.isArchived ? "text-primary fill-primary/10" : ""}`} />
             </Button>
-            <Button variant="ghost" size="icon" disabled>
+            <Button variant="ghost" size="icon" onClick={() => onDelete?.(email.id)} title="Delete (Not Implemented)">
                 <Trash2 className="w-4 h-4" />
             </Button>
             <Separator orientation="vertical" className="h-6 mx-1" />
-             <Button variant="ghost" size="icon" disabled>
+             <Button variant="ghost" size="icon" onClick={() => onToggleStar?.(email.id, email.isStarred)} title={email.isStarred ? "Unstar" : "Star"}>
                 <Star className={`w-4 h-4 ${email.isStarred ? "fill-yellow-400 text-yellow-400" : ""}`} />
             </Button>
         </div>

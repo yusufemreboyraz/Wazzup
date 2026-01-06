@@ -153,7 +153,7 @@ export function ComposeDialog() {
                         <Field data-invalid={fieldState.invalid} orientation="horizontal" className="items-center">
                         <FieldLabel className="w-12 font-medium">To:</FieldLabel>
                         <Input 
-                            placeholder="Recipient Email" 
+                            placeholder="Recipient Email (e.g. bob@crypto.agu)" 
                             className="border-0 shadow-none focus-visible:ring-0 px-0 h-auto py-1 placeholder:text-muted-foreground/50"
                             {...field} 
                             onChange={(e) => field.onChange(e.target.value.toLowerCase())}
