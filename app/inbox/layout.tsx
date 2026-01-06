@@ -7,9 +7,10 @@ import Link from "next/link";
 import { ComposeDialog } from "@/components/email/compose-dialog";
 import { useCompose } from "@/context/compose-context";
 
-import { Inbox, Send, LogOut, RefreshCw, Hexagon, Archive } from "lucide-react";
+import { Inbox, Send, LogOut, RefreshCw, Hexagon, Archive, Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation";
+import { useTheme } from "next-themes";
 
 import { useEffect, useState } from "react";
 import {
@@ -31,6 +32,7 @@ export default function InboxLayout({
   const pathname = usePathname();
   const { openCompose } = useCompose();
   const [counts, setCounts] = useState({ inbox: 0 });
+  const { setTheme, theme } = useTheme();
 
   useEffect(() => {
     if (!user) return;
@@ -137,6 +139,11 @@ export default function InboxLayout({
                      </DropdownMenuTrigger>
                      <DropdownMenuContent align="start" className="w-[190px]">
                          <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                         <DropdownMenuSeparator />
+                         <DropdownMenuItem onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
+                             {theme === "dark" ? <Sun className="mr-2 h-4 w-4" /> : <Moon className="mr-2 h-4 w-4" />}
+                             {theme === "dark" ? "Light Mode" : "Dark Mode"}
+                         </DropdownMenuItem>
                          <DropdownMenuSeparator />
                          <DropdownMenuItem className="text-red-500 focus:text-red-500" onClick={handleLogout}>
                              <LogOut className="mr-2 h-4 w-4" /> Log out

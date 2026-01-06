@@ -1,9 +1,9 @@
 import { LoginForm } from "@/components/auth/login-form";
+import { redirect } from 'next/navigation';
 
 export default function LoginPage() {
-  return (
-    <div className="flex h-screen items-center justify-center">
-      <LoginForm />
-    </div>
-  );
+  // Since we moved the main login experience to the landing page,
+  // we can either redirect OR show the same component.
+  // Redirecting to root is cleaner if root IS the login page.
+  redirect('/');
 }

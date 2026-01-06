@@ -84,7 +84,7 @@ export function LoginForm() {
   }
 
   return (
-    <Card className="w-[350px]">
+    <Card className="w-full">
       <CardHeader>
         <CardTitle>Login</CardTitle>
         <CardDescription>Access your secure inbox.</CardDescription>
